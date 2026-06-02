@@ -11,7 +11,6 @@ import { useAuth } from '@/lib/auth'
 
 const ADMIN_ROLES    = ['super_admin', 'admin']
 const MANAGER_ROLES  = ['super_admin', 'admin', 'account_manager', 'project_manager']
-const FINANCE_ROLES  = ['super_admin', 'admin', 'account_manager']
 const REPORT_ROLES   = ['super_admin', 'admin']
 
 function can(role, allowedRoles) { return allowedRoles.includes(role) }

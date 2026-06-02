@@ -70,7 +70,7 @@ export default function PortalTickets() {
     return (
       <div className="space-y-4 animate-slide-up">
         <div className="flex items-center gap-2">
-          <button className="btn btn-ghost btn-sm gap-1 text-fg-3 hover:text-fg" onClick={() => setSelected(null)}>
+          <button className="btn btn-ghost btn-sm gap-1 text-fg-3 hover:text-fg" onClick={() => { setSelected(null); setCreateOpen(false) }}>
             <ChevronLeft size={15} /> Back to Tickets
           </button>
         </div>

@@ -197,7 +197,7 @@ export default function TicketsPage() {
                   <label className="block text-[10px] text-fg-3 mb-1 uppercase tracking-wide">Assigned To</label>
                   <select className="input text-xs" style={{ width: 160 }} value={selected.assignedTo?._id || ''}
                     onChange={e => changeAssign(selected._id, e.target.value)} disabled={changingTicket}>
-                    <option value="">Unassigned</option>
+                    <option value="" disabled>Select assignee</option>
                     {users.filter(u => u.role !== 'client').map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
                   </select>
                 </div>

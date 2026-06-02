@@ -290,7 +290,7 @@ export default function FinancePage() {
               ))}
             </select>
             <select className="input" style={{ width: 90 }} value={expYear} onChange={e => setExpYear(Number(e.target.value))}>
-              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i).map(y => <option key={y} value={y}>{y}</option>)}
             </select>
             <div className="ml-auto">
               <button className="btn btn-primary btn-sm gap-1" onClick={() => { setExpForm({ ...EMPTY_EXP }); setExpModalOpen(true) }}>
