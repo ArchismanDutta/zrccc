@@ -33,8 +33,10 @@ export default function TicketsPage() {
   const [reply,  setReply]            = useState('')
   const [saving, setSaving]           = useState(false)
   const [sendingReply, setSendingReply] = useState(false)
+  const [changingTicket, setChangingTicket] = useState(false)
 
   const fetchTickets = async () => {
+    setLoading(true)
     try {
       const q = [
         filterStatus   ? `status=${filterStatus}`     : '',
@@ -92,6 +94,8 @@ export default function TicketsPage() {
   }
 
   const changeStatus = async (ticketId, status) => {
+    if (changingTicket) return
+    setChangingTicket(true)
     try {
       await api.updateTicketStatus(ticketId, { status })
       toast.success('Status updated')
@@ -99,9 +103,12 @@ export default function TicketsPage() {
       setSelected(r.data)
       fetchTickets()
     } catch (err) { toast.error(err.message) }
+    finally { setChangingTicket(false) }
   }
 
   const changeAssign = async (ticketId, assignedTo) => {
+    if (!assignedTo || changingTicket) return
+    setChangingTicket(true)
     try {
       await api.assignTicket(ticketId, { assignedTo })
       toast.success('Assigned')
@@ -109,14 +116,17 @@ export default function TicketsPage() {
       setSelected(r.data)
       fetchTickets()
     } catch (err) { toast.error(err.message) }
+    finally { setChangingTicket(false) }
   }
 
   return (
     <div className="space-y-4 animate-slide-up">
       <PageHeader title="Support Tickets" subtitle="Client support requests">
-        <button className="btn btn-primary btn-sm gap-1" onClick={() => { setForm({ ...EMPTY_FORM }); setCreateOpen(true) }}>
-          <Plus size={15} /> New Ticket
-        </button>
+        {isAdmin && (
+          <button className="btn btn-primary btn-sm gap-1" onClick={() => { setForm({ ...EMPTY_FORM }); setCreateOpen(true) }}>
+            <Plus size={15} /> New Ticket
+          </button>
+        )}
       </PageHeader>
 
       {/* Filters */}
@@ -179,14 +189,14 @@ export default function TicketsPage() {
                 <div>
                   <label className="block text-[10px] text-fg-3 mb-1 uppercase tracking-wide">Status</label>
                   <select className="input text-xs" style={{ width: 140 }} value={selected.status}
-                    onChange={e => changeStatus(selected._id, e.target.value)}>
+                    onChange={e => changeStatus(selected._id, e.target.value)} disabled={changingTicket}>
                     {STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-[10px] text-fg-3 mb-1 uppercase tracking-wide">Assigned To</label>
                   <select className="input text-xs" style={{ width: 160 }} value={selected.assignedTo?._id || ''}
-                    onChange={e => changeAssign(selected._id, e.target.value)}>
+                    onChange={e => changeAssign(selected._id, e.target.value)} disabled={changingTicket}>
                     <option value="">Unassigned</option>
                     {users.filter(u => u.role !== 'client').map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
                   </select>
@@ -210,9 +220,9 @@ export default function TicketsPage() {
               <div className="space-y-2">
                 <p className="text-[10px] text-fg-3 uppercase tracking-wide">Replies</p>
                 {selected.replies.map((r, i) => {
-                  const isTeam = r.userId?.role !== 'client'
+                  const isTeam = r.userId?.role != null && r.userId.role !== 'client'
                   return (
-                    <div key={i} className={`rounded-xl p-3 ${isTeam ? 'bg-accent/8 border border-accent/20' : 'bg-[var(--color-surface-2)]'}`}>
+                    <div key={r._id || i} className={`rounded-xl p-3 ${isTeam ? 'bg-accent/8 border border-accent/20' : 'bg-[var(--color-surface-2)]'}`}>
                       <div className="flex items-center gap-2 mb-1">
                         <Avatar name={r.userId?.name || '?'} size="xs" />
                         <span className="text-xs font-semibold text-fg">{r.userId?.name || 'Unknown'}</span>
