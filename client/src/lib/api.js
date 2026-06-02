@@ -101,6 +101,23 @@ class ApiClient {
   // Notifications
   getNotifications() { return this.get('/notifications') }
   markAllRead() { return this.post('/notifications/mark-all-read') }
+
+  // Expenses
+  getExpenses(q = '') { return this.get(`/expenses${q}`) }
+  createExpense(d) { return this.post('/expenses', d) }
+  updateExpense(id, d) { return this.patch(`/expenses/${id}`, d) }
+  deleteExpense(id) { return this.del(`/expenses/${id}`) }
+
+  // P&L
+  getPL(months = 6) { return this.get(`/stats/pl?months=${months}`) }
+
+  // Support Tickets
+  getTickets(q = '') { return this.get(`/tickets${q}`) }
+  getTicket(id) { return this.get(`/tickets/${id}`) }
+  createTicket(d) { return this.post('/tickets', d) }
+  updateTicketStatus(id, d) { return this.patch(`/tickets/${id}/status`, d) }
+  assignTicket(id, d) { return this.patch(`/tickets/${id}/assign`, d) }
+  addTicketReply(id, d) { return this.post(`/tickets/${id}/reply`, d) }
 }
 
 export const api = new ApiClient()
