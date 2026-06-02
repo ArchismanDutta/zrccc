@@ -1,0 +1,183 @@
+// controllers/client.controller.js
+const Client = require("../models/Client");
+const { nextSequence } = require("../models/Counter");
+const { success, created, paginated } = require("../utils/response");
+const { ValidationError, NotFoundError } = require("../utils/errors");
+const { logAudit } = require("../services/audit.service");
+
+// POST /api/clients
+exports.createClient = async (req, res, next) => {
+  try {
+    const { companyName, contactName, contactEmail, services, contract, priority } = req.body;
+    if (!companyName) throw new ValidationError("companyName is required");
+
+    const seq = await nextSequence("client");
+    const clientId = `ZRC-CLT-${String(seq).padStart(5, "0")}`;
+
+    const client = await Client.create({
+      clientId,
+      companyName,
+      displayName: req.body.displayName || companyName,
+      contactName,
+      contactEmail,
+      contactPhone: req.body.contactPhone || "",
+      website: req.body.website || "",
+      industry: req.body.industry || "",
+      region: req.body.region || "",
+      gstNumber: req.body.gstNumber || "",
+      panNumber: req.body.panNumber || "",
+      billingAddress: req.body.billingAddress || "",
+      services: services || [],
+      contract: contract || {},
+      priority: priority || "medium",
+      status: "prospect",
+      statusHistory: [{ to: "prospect", changedBy: req.user.id }],
+      accountManagerId: req.body.accountManagerId || req.user.id,
+      enteredBy: req.user.id,
+    });
+
+    await logAudit({
+      action: "client.create", entity: "Client", entityId: client._id,
+      userId: req.user.id, details: { clientId, companyName }, req,
+    });
+
+    created(res, client);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/clients
+exports.listClients = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, status, search, sort = "-createdAt" } = req.query;
+    const filter = { isArchived: false };
+
+    if (status) filter.status = status;
+
+    // Scope by role: account_manager sees only their own
+    if (req.user.role === "account_manager") {
+      filter.accountManagerId = req.user.id;
+    }
+
+    if (search) {
+      filter.$or = [
+        { companyName: { $regex: search, $options: "i" } },
+        { contactName: { $regex: search, $options: "i" } },
+        { displayName: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [docs, total] = await Promise.all([
+      Client.find(filter)
+        .populate("accountManagerId", "name email avatar")
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Client.countDocuments(filter),
+    ]);
+
+    paginated(res, { docs, total, page: parseInt(page), limit: parseInt(limit) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/clients/:id
+exports.getClient = async (req, res, next) => {
+  try {
+    const client = await Client.findById(req.params.id)
+      .populate("accountManagerId", "name email avatar")
+      .populate("portalUserId", "name email")
+      .lean();
+    if (!client || client.isArchived) throw new NotFoundError("Client");
+
+    success(res, client);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /api/clients/:id
+exports.updateClient = async (req, res, next) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client || client.isArchived) throw new NotFoundError("Client");
+
+    const allowed = [
+      "companyName", "displayName", "contactName", "contactEmail", "contactPhone",
+      "website", "industry", "region", "gstNumber", "panNumber", "billingAddress",
+      "services", "contract", "priority", "healthScore", "tags", "notes",
+      "lastContactedAt", "nextFollowUpAt", "logo",
+    ];
+
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) client[key] = req.body[key];
+    }
+
+    await client.save();
+
+    await logAudit({
+      action: "client.update", entity: "Client", entityId: client._id,
+      userId: req.user.id, details: { fields: Object.keys(req.body) }, req,
+    });
+
+    success(res, client);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /api/clients/:id/status
+exports.changeStatus = async (req, res, next) => {
+  try {
+    const { status, reason } = req.body;
+    if (!status) throw new ValidationError("status is required");
+
+    const client = await Client.findById(req.params.id);
+    if (!client) throw new NotFoundError("Client");
+
+    if (status === "churned" && !reason) {
+      throw new ValidationError("Churn reason is required when setting status to churned");
+    }
+
+    client.statusHistory.push({
+      from: client.status, to: status, changedBy: req.user.id, reason: reason || "",
+    });
+    client.status = status;
+    if (status === "churned") client.churnReason = reason;
+
+    await client.save();
+
+    await logAudit({
+      action: "client.status_change", entity: "Client", entityId: client._id,
+      userId: req.user.id, details: { from: client.statusHistory.at(-1).from, to: status, reason }, req,
+    });
+
+    success(res, client);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/clients/:id (soft delete)
+exports.archiveClient = async (req, res, next) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client) throw new NotFoundError("Client");
+
+    client.isArchived = true;
+    await client.save();
+
+    await logAudit({
+      action: "client.archive", entity: "Client", entityId: client._id,
+      userId: req.user.id, req,
+    });
+
+    success(res, { message: "Client archived" });
+  } catch (err) {
+    next(err);
+  }
+};
