@@ -16,10 +16,12 @@ import MessagesPage  from '@/pages/Messages'
 import ReportsPage   from '@/pages/Reports'
 import SettingsPage  from '@/pages/Settings'
 import SalaryPage    from '@/pages/Salary'
+import TicketsPage   from '@/pages/Tickets'
 import PortalOverview    from '@/pages/portal/Overview'
 import PortalProjects    from '@/pages/portal/PortalProjects'
 import PortalContent     from '@/pages/portal/PortalContent'
 import PortalInvoices    from '@/pages/portal/PortalInvoices'
+import PortalTickets from '@/pages/portal/PortalTickets'
 
 function ProtectedRoutes() {
   const { isAuthenticated, loading, user } = useAuth()
@@ -42,6 +44,7 @@ function ProtectedRoutes() {
           <Route path="projects"  element={<PortalProjects />} />
           <Route path="content"   element={<PortalContent />} />
           <Route path="invoices"  element={<PortalInvoices />} />
+          <Route path="tickets"  element={<PortalTickets />} />
         </Route>
         <Route path="*" element={<Navigate to="/portal/overview" replace />} />
       </Routes>
@@ -70,6 +73,7 @@ function ProtectedRoutes() {
         <Route path="messages"  element={<MessagesPage />} />
         {isReporter && <Route path="reports"  element={<ReportsPage />} />}
         {r === 'super_admin' && <Route path="salary" element={<SalaryPage />} />}
+        {isAdmin    && <Route path="tickets" element={<TicketsPage />} />}
         {isAdmin    && <Route path="settings" element={<SettingsPage />} />}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>

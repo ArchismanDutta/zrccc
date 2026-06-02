@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, Calendar, FileText, LogOut, Menu, X, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Calendar, FileText, LogOut, Menu, X, Sun, Moon, LifeBuoy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/Avatar'
 import { useAuth } from '@/lib/auth'
@@ -11,6 +11,7 @@ const NAV = [
   { to: '/portal/projects',  icon: Briefcase,       label: 'My Projects' },
   { to: '/portal/content',   icon: Calendar,        label: 'Content' },
   { to: '/portal/invoices',  icon: FileText,        label: 'Invoices' },
+  { to: '/portal/tickets',   icon: LifeBuoy,        label: 'Support' },
 ]
 
 export function ClientLayout() {
