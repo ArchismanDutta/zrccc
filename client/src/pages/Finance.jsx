@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { DollarSign, AlertCircle, CheckCircle, Plus, Send, Download } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { PageHeader, SectionCard, StatCard } from '@/components/ui/Cards'
 import { StatusBadge, Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
@@ -47,6 +47,8 @@ export default function FinancePage() {
   const [expYear, setExpYear] = useState(new Date().getFullYear())
   const [expModalOpen, setExpModalOpen] = useState(false)
   const [expForm, setExpForm] = useState({ ...EMPTY_EXP })
+  const [plData, setPlData] = useState([])
+  const [plMonths, setPlMonths] = useState(6)
 
   const fetchAll = async () => {
     try {
@@ -64,9 +66,16 @@ export default function FinancePage() {
       setExpenses(r.data || [])
     } catch { toast.error('Failed to load expenses') }
   }
+  const fetchPL = async (m = plMonths) => {
+    try {
+      const r = await api.getPL(m)
+      setPlData(r.data || [])
+    } catch { toast.error('Failed to load P&L data') }
+  }
 
-  useEffect(() => { fetchAll(); fetchExpenses() }, [])
+  useEffect(() => { fetchAll(); fetchExpenses(); fetchPL() }, [])
   useEffect(() => { fetchExpenses() }, [expMonth, expYear])
+  useEffect(() => { fetchPL(plMonths) }, [plMonths])
 
   const openInvModal = async () => { setInvForm({ ...EMPTY_INV }); setInvModalOpen(true); try { const c = await api.getClients('?limit=100'); setClients(c.data) } catch {} }
   const openPayModal = (inv) => { setPayForm({ invoiceId: inv._id, amount: inv.totalAmount - inv.paidAmount, paymentDate: new Date().toISOString().split('T')[0], paymentMethod: 'bank_transfer', transactionRef: '', notes: '' }); setPayModalOpen(true) }
@@ -172,7 +181,7 @@ export default function FinancePage() {
 
       {/* Tab switcher */}
       <div className="flex gap-1 p-1 rounded-xl bg-[var(--color-surface-2)] w-fit">
-        {[['invoices', 'Invoices'], ['client-payments', 'Client Payments'], ['expenses', 'Expenses']].map(([key, label]) => (
+        {[['invoices', 'Invoices'], ['client-payments', 'Client Payments'], ['expenses', 'Expenses'], ['pl', 'P & L']].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === key ? 'bg-[var(--color-surface)] text-fg shadow-sm' : 'text-fg-3 hover:text-fg'}`}>
             {label}
@@ -346,6 +355,73 @@ export default function FinancePage() {
               </div>
             )}
           </SectionCard>
+        </div>
+      )}
+
+      {/* P&L Tab */}
+      {tab === 'pl' && (
+        <div className="space-y-4">
+          {/* Range picker */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {[3, 6, 12].map(m => (
+              <button key={m} onClick={() => setPlMonths(m)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${plMonths === m ? 'bg-accent text-white' : 'bg-[var(--color-surface-2)] text-fg-3 hover:text-fg'}`}>
+                {m} months
+              </button>
+            ))}
+          </div>
+
+          {/* Summary cards */}
+          {(() => {
+            const totRev  = plData.reduce((s, d) => s + d.revenue, 0)
+            const totExp  = plData.reduce((s, d) => s + d.expenses, 0)
+            const totSal  = plData.reduce((s, d) => s + d.salaries, 0)
+            const totProf = plData.reduce((s, d) => s + d.netProfit, 0)
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Total Revenue',   value: totRev,  colour: 'var(--color-accent)' },
+                  { label: 'Total Expenses',  value: totExp,  colour: 'var(--color-warning)' },
+                  { label: 'Total Salaries',  value: totSal,  colour: 'var(--color-info)' },
+                  { label: 'Net Profit',      value: totProf, colour: totProf >= 0 ? 'var(--color-success)' : 'var(--color-danger)' },
+                ].map(card => (
+                  <div key={card.label} className="card p-4">
+                    <p className="text-[10px] text-fg-3 uppercase tracking-wide mb-1">{card.label}</p>
+                    <p className="text-lg font-bold" style={{ color: card.colour }}>{formatCurrency(card.value)}</p>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* Line chart */}
+          {plData.length > 0 && (
+            <SectionCard title="Revenue vs Costs vs Net Profit">
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={plData.map(d => ({
+                  month: `${d.month} ${d.year}`,
+                  Revenue: d.revenue,
+                  Costs: d.expenses + d.salaries,
+                  Profit: d.netProfit,
+                }))} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--color-fg-3)' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 9, fill: 'var(--color-fg-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v/1000}k`} width={46} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="Revenue" stroke="var(--color-accent)"  strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="Costs"   stroke="var(--color-warning)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="Profit"  stroke="var(--color-success)" strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </SectionCard>
+          )}
+
+          {plData.length === 0 && (
+            <div className="card p-12 text-center">
+              <p className="text-sm text-fg-3">No data yet. Add expenses and log payments to see P&amp;L.</p>
+            </div>
+          )}
         </div>
       )}
 
