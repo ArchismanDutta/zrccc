@@ -12,6 +12,9 @@ import api from '@/lib/api'
 const SVC_TYPES = ['social_media_management','meta_ads','reels','graphics','carousels','video_production','website_development','website_maintenance','content_writing','photography']
 const SVC_LABEL = { social_media_management:'Social Media', meta_ads:'Meta Ads', reels:'Reels', graphics:'Graphics', carousels:'Carousels', video_production:'Video', website_development:'Website Dev', website_maintenance:'Web Maint.', content_writing:'Content', photography:'Photography' }
 const PAY_METHODS = ['bank_transfer','upi','cash','cheque','card']
+const EXPENSE_CATS = ['rent','utilities','software_tools','freelancer','equipment','office_supplies','marketing','travel','misc']
+const EXPENSE_LABELS = { rent:'Rent', utilities:'Utilities', software_tools:'Software / Tools', freelancer:'Freelancer', equipment:'Equipment', office_supplies:'Office Supplies', marketing:'Marketing', travel:'Travel', misc:'Miscellaneous' }
+const EMPTY_EXP = { category: '', description: '', amount: '', date: new Date().toISOString().split('T')[0], vendor: '', notes: '', recurring: false }
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
@@ -39,6 +42,11 @@ export default function FinancePage() {
   const [invForm, setInvForm] = useState({ ...EMPTY_INV })
   const [payForm, setPayForm] = useState({ ...EMPTY_PAY })
   const [saving, setSaving] = useState(false)
+  const [expenses, setExpenses] = useState([])
+  const [expMonth, setExpMonth] = useState(new Date().getMonth() + 1)
+  const [expYear, setExpYear] = useState(new Date().getFullYear())
+  const [expModalOpen, setExpModalOpen] = useState(false)
+  const [expForm, setExpForm] = useState({ ...EMPTY_EXP })
 
   const fetchAll = async () => {
     try {
@@ -50,7 +58,15 @@ export default function FinancePage() {
     } catch { toast.error('Failed to load finance data') }
     finally { setLoading(false) }
   }
-  useEffect(() => { fetchAll() }, [])
+  const fetchExpenses = async () => {
+    try {
+      const r = await api.getExpenses(`?month=${expMonth}&year=${expYear}&limit=200`)
+      setExpenses(r.data || [])
+    } catch { toast.error('Failed to load expenses') }
+  }
+
+  useEffect(() => { fetchAll(); fetchExpenses() }, [])
+  useEffect(() => { fetchExpenses() }, [expMonth, expYear])
 
   const openInvModal = async () => { setInvForm({ ...EMPTY_INV }); setInvModalOpen(true); try { const c = await api.getClients('?limit=100'); setClients(c.data) } catch {} }
   const openPayModal = (inv) => { setPayForm({ invoiceId: inv._id, amount: inv.totalAmount - inv.paidAmount, paymentDate: new Date().toISOString().split('T')[0], paymentMethod: 'bank_transfer', transactionRef: '', notes: '' }); setPayModalOpen(true) }
@@ -78,6 +94,30 @@ export default function FinancePage() {
     setSaving(true)
     try { await api.logPayment({ ...payForm, amount: Number(payForm.amount) }); toast.success('Payment logged!'); setPayModalOpen(false); fetchAll() }
     catch (err) { toast.error(err.message) } finally { setSaving(false) }
+  }
+
+  const submitExpense = async () => {
+    if (!expForm.category) { toast.error('Select a category'); return }
+    if (!expForm.description) { toast.error('Enter a description'); return }
+    if (!expForm.amount || Number(expForm.amount) <= 0) { toast.error('Enter a valid amount'); return }
+    setSaving(true)
+    try {
+      await api.createExpense({ ...expForm, amount: Number(expForm.amount) })
+      toast.success('Expense added')
+      setExpModalOpen(false)
+      setExpForm({ ...EMPTY_EXP })
+      fetchExpenses()
+    } catch (err) { toast.error(err.message) }
+    finally { setSaving(false) }
+  }
+
+  const deleteExpense = async (id) => {
+    if (!window.confirm('Delete this expense?')) return
+    try {
+      await api.deleteExpense(id)
+      toast.success('Deleted')
+      fetchExpenses()
+    } catch (err) { toast.error(err.message) }
   }
 
   const sendInvoice = async (id) => { try { await api.sendInvoice(id); toast.success('Invoice sent!'); fetchAll() } catch (err) { toast.error(err.message) } }
@@ -132,7 +172,7 @@ export default function FinancePage() {
 
       {/* Tab switcher */}
       <div className="flex gap-1 p-1 rounded-xl bg-[var(--color-surface-2)] w-fit">
-        {[['invoices', 'Invoices'], ['client-payments', 'Client Payments']].map(([key, label]) => (
+        {[['invoices', 'Invoices'], ['client-payments', 'Client Payments'], ['expenses', 'Expenses']].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === key ? 'bg-[var(--color-surface)] text-fg shadow-sm' : 'text-fg-3 hover:text-fg'}`}>
             {label}
@@ -230,6 +270,85 @@ export default function FinancePage() {
         </div>
       </SectionCard>}
 
+      {/* Expenses Tab */}
+      {tab === 'expenses' && (
+        <div className="space-y-4">
+          {/* Filter + add row */}
+          <div className="flex flex-wrap items-center gap-3">
+            <select className="input" style={{ width: 120 }} value={expMonth} onChange={e => setExpMonth(Number(e.target.value))}>
+              {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                <option key={m} value={m}>{['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m]}</option>
+              ))}
+            </select>
+            <select className="input" style={{ width: 90 }} value={expYear} onChange={e => setExpYear(Number(e.target.value))}>
+              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <div className="ml-auto">
+              <button className="btn btn-primary btn-sm gap-1" onClick={() => { setExpForm({ ...EMPTY_EXP }); setExpModalOpen(true) }}>
+                <Plus size={14} /> Add Expense
+              </button>
+            </div>
+          </div>
+
+          {/* Category chart */}
+          {(() => {
+            const catData = EXPENSE_CATS.map(cat => ({
+              name: EXPENSE_LABELS[cat],
+              total: expenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0),
+            })).filter(d => d.total > 0)
+            return catData.length > 0 ? (
+              <SectionCard title="By Category">
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={catData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={4}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'var(--color-fg-3)' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 9, fill: 'var(--color-fg-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v/1000}k`} width={42} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="total" name="Amount" fill="var(--color-warning)" radius={[4,4,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </SectionCard>
+            ) : null
+          })()}
+
+          {/* Expenses table */}
+          <SectionCard
+            title="Expenses"
+            subtitle={`${expenses.length} record${expenses.length !== 1 ? 's' : ''} · Total: ${formatCurrency(expenses.reduce((s, e) => s + e.amount, 0))}`}
+          >
+            {expenses.length === 0 ? (
+              <p className="text-sm text-fg-3 text-center py-10">No expenses recorded for this month.</p>
+            ) : (
+              <div className="table-container" style={{ border: 'none', borderRadius: 0, boxShadow: 'none' }}>
+                <table>
+                  <thead><tr>
+                    <th>Date</th><th>Category</th><th>Vendor</th><th>Description</th>
+                    <th className="text-right">Amount</th><th></th>
+                  </tr></thead>
+                  <tbody>
+                    {expenses.map(exp => (
+                      <tr key={exp._id}>
+                        <td className="text-xs text-fg-2 whitespace-nowrap">{formatDate(exp.date)}</td>
+                        <td>
+                          <span className="badge badge-warning text-[10px]">{EXPENSE_LABELS[exp.category] || exp.category}</span>
+                          {exp.recurring && <span className="badge badge-info text-[10px] ml-1">Recurring</span>}
+                        </td>
+                        <td className="text-xs text-fg-2">{exp.vendor || '—'}</td>
+                        <td className="text-xs text-fg max-w-[200px] truncate">{exp.description}</td>
+                        <td className="text-right font-semibold text-fg whitespace-nowrap">{formatCurrency(exp.amount)}</td>
+                        <td>
+                          <button className="btn btn-ghost btn-sm text-[var(--color-danger)] text-xs" onClick={() => deleteExpense(exp._id)}>✕</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </SectionCard>
+        </div>
+      )}
+
       {/* New Invoice Modal */}
       <Modal isOpen={invModalOpen} onClose={() => setInvModalOpen(false)} title="New Invoice" size="lg" footer={
         <><button className="btn btn-secondary" onClick={() => setInvModalOpen(false)}>Cancel</button>
@@ -305,6 +424,36 @@ export default function FinancePage() {
           <input className="input" value={payForm.transactionRef} onChange={e => setPayForm(f => ({ ...f, transactionRef: e.target.value }))} placeholder="e.g. NEFT-MAY-001" /></div>
           <div><label className="block text-xs font-medium text-fg-2 mb-1">Notes</label>
           <input className="input" value={payForm.notes} onChange={e => setPayForm(f => ({ ...f, notes: e.target.value }))} /></div>
+        </div>
+      </Modal>
+
+      {/* Add Expense Modal */}
+      <Modal isOpen={expModalOpen} onClose={() => setExpModalOpen(false)} title="Add Expense" size="sm" footer={
+        <><button className="btn btn-secondary" onClick={() => setExpModalOpen(false)}>Cancel</button>
+        <button className="btn btn-primary" onClick={submitExpense} disabled={saving}>{saving ? 'Saving…' : 'Add Expense'}</button></>
+      }>
+        <div className="space-y-3">
+          <div><label className="block text-xs font-medium text-fg-2 mb-1">Category *</label>
+          <select className="input" value={expForm.category} onChange={e => setExpForm(f => ({ ...f, category: e.target.value }))}>
+            <option value="">Select category</option>
+            {EXPENSE_CATS.map(c => <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>)}
+          </select></div>
+          <div><label className="block text-xs font-medium text-fg-2 mb-1">Description *</label>
+          <input className="input" value={expForm.description} onChange={e => setExpForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Adobe Creative Cloud May" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-xs font-medium text-fg-2 mb-1">Amount (₹) *</label>
+            <input type="number" className="input" value={expForm.amount} onChange={e => setExpForm(f => ({ ...f, amount: e.target.value }))} /></div>
+            <div><label className="block text-xs font-medium text-fg-2 mb-1">Date *</label>
+            <input type="date" className="input" value={expForm.date} onChange={e => setExpForm(f => ({ ...f, date: e.target.value }))} /></div>
+          </div>
+          <div><label className="block text-xs font-medium text-fg-2 mb-1">Vendor</label>
+          <input className="input" value={expForm.vendor} onChange={e => setExpForm(f => ({ ...f, vendor: e.target.value }))} placeholder="e.g. Adobe Inc." /></div>
+          <div><label className="block text-xs font-medium text-fg-2 mb-1">Notes</label>
+          <input className="input" value={expForm.notes} onChange={e => setExpForm(f => ({ ...f, notes: e.target.value }))} /></div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={expForm.recurring} onChange={e => setExpForm(f => ({ ...f, recurring: e.target.checked }))} className="rounded" />
+            <span className="text-xs text-fg-2">Recurring monthly expense</span>
+          </label>
         </div>
       </Modal>
     </div>
