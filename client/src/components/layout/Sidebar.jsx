@@ -38,7 +38,8 @@ function buildNavSections(role) {
       label: 'Business',
       items: [
         ...(can(role, FINANCE_ROLES)  ? [{ to: '/finance',  icon: DollarSign,   label: 'Finance' }]  : []),
-        ...(role === 'super_admin'    ? [{ to: '/salary',   icon: Wallet,        label: 'Salary' }]   : []),
+        ...(role === 'super_admin'    ? [{ to: '/salary',      icon: Wallet,      label: 'Salary' }]      : []),
+        ...(role !== 'super_admin'    ? [{ to: '/my-payslips', icon: Wallet,      label: 'My Payslips' }] : []),
         ...(can(role, TICKET_ROLES)   ? [{ to: '/tickets',  icon: LifeBuoy,      label: 'Tickets' }]  : []),
         { to: '/messages', icon: MessageSquare, label: 'Messages' },
         ...(can(role, REPORT_ROLES)   ? [{ to: '/reports',  icon: BarChart3,     label: 'Reports' }]  : []),

@@ -20,7 +20,8 @@ import ReportsPage   from '@/pages/Reports'
 import SettingsPage  from '@/pages/Settings'
 import SalaryPage    from '@/pages/Salary'
 import TicketsPage   from '@/pages/Tickets'
-import AuditLogPage  from '@/pages/AuditLog'
+import AuditLogPage    from '@/pages/AuditLog'
+import MyPayslipsPage  from '@/pages/MyPayslips'
 import PortalOverview    from '@/pages/portal/Overview'
 import PortalProjects    from '@/pages/portal/PortalProjects'
 import PortalContent     from '@/pages/portal/PortalContent'
@@ -84,6 +85,7 @@ function ProtectedRoutes() {
         <Route path="messages"  element={<MessagesPage />} />
         {isReporter && <Route path="reports"  element={<ReportsPage />} />}
         {r === 'super_admin' && <Route path="salary" element={<SalaryPage />} />}
+        <Route path="my-payslips" element={<MyPayslipsPage />} />
         {canTickets && <Route path="tickets" element={<TicketsPage />} />}
         {isAdmin    && <Route path="settings"  element={<SettingsPage />} />}
         {isAdmin    && <Route path="audit"     element={<AuditLogPage />} />}
