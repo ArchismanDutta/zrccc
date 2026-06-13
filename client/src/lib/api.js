@@ -1,29 +1,55 @@
-const API_BASE = 'http://localhost:5001/api'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api'
 
 class ApiClient {
-  constructor() { this.token = localStorage.getItem('zrc_token') || null }
-
-  setToken(t) { this.token = t; t ? localStorage.setItem('zrc_token', t) : localStorage.removeItem('zrc_token') }
-  getToken() { return this.token || localStorage.getItem('zrc_token') }
+  #refreshing = false
 
   async request(endpoint, options = {}) {
     const headers = { 'Content-Type': 'application/json', ...options.headers }
-    const token = this.getToken()
-    if (token) headers['Authorization'] = `Bearer ${token}`
-    const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers })
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+    })
+
+    if (res.status === 401 && !options._retry && !this.#refreshing) {
+      this.#refreshing = true
+      try {
+        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        })
+        this.#refreshing = false
+        if (refreshRes.ok) {
+          return this.request(endpoint, { ...options, _retry: true })
+        }
+      } catch (_) {
+        this.#refreshing = false
+      }
+    }
+
     const data = await res.json()
-    if (!res.ok) { const err = new Error(data?.error?.message || 'Request failed'); err.status = res.status; throw err }
+    if (!res.ok) {
+      const err = new Error(data?.error?.message || 'Request failed')
+      err.status = res.status
+      throw err
+    }
     return data
   }
 
-  get(e) { return this.request(e) }
-  post(e, b) { return this.request(e, { method: 'POST', body: JSON.stringify(b) }) }
+  get(e, o = {}) { return this.request(e, o) }
+  post(e, b, o = {}) { return this.request(e, { method: 'POST', body: JSON.stringify(b), ...o }) }
   patch(e, b) { return this.request(e, { method: 'PATCH', body: JSON.stringify(b) }) }
   del(e) { return this.request(e, { method: 'DELETE' }) }
 
   // Auth
   login(email, password) { return this.post('/auth/login', { email, password }) }
+  logout() { return this.post('/auth/logout') }
   getMe() { return this.get('/auth/me') }
+  refresh() { return this.post('/auth/refresh') }
+  forgotPassword(email) { return this.post('/auth/forgot-password', { email }) }
+  resetPassword(token, newPassword) { return this.post('/auth/reset-password', { token, newPassword }) }
+  revokeAllSessions() { return this.post('/auth/revoke-all-sessions') }
 
   // Clients
   getClients(q = '') { return this.get(`/clients${q}`) }
@@ -66,8 +92,7 @@ class ApiClient {
   createInvoice(d) { return this.post('/finance/invoices', d) }
   sendInvoice(id) { return this.post(`/finance/invoices/${id}/send`) }
   downloadInvoicePdf(id) {
-    const token = this.getToken()
-    return fetch(`${API_BASE}/finance/invoices/${id}/pdf`, { headers: { Authorization: `Bearer ${token}` } })
+    return fetch(`${API_BASE}/finance/invoices/${id}/pdf`, { credentials: 'include' })
   }
   getClientPayments() { return this.get('/finance/client-payments') }
   logPayment(d) { return this.post('/finance/payments', d) }
@@ -81,8 +106,7 @@ class ApiClient {
   updateDeductions(id, d) { return this.patch(`/hr/salaries/${id}/deductions`, d) }
   getMySalaryRecords() { return this.get('/hr/salaries/mine') }
   downloadPayslip(id) {
-    const token = this.getToken()
-    return fetch(`${API_BASE}/hr/salaries/${id}/payslip`, { headers: { Authorization: `Bearer ${token}` } })
+    return fetch(`${API_BASE}/hr/salaries/${id}/payslip`, { credentials: 'include' })
   }
 
   // Users
@@ -118,6 +142,11 @@ class ApiClient {
   updateTicketStatus(id, d) { return this.patch(`/tickets/${id}/status`, d) }
   assignTicket(id, d) { return this.patch(`/tickets/${id}/assign`, d) }
   addTicketReply(id, d) { return this.post(`/tickets/${id}/reply`, d) }
+
+  // Messages
+  getChannels() { return this.get('/messages/channels') }
+  getMessages(channelId, cursor) { return this.get(`/messages/${channelId}${cursor ? `?before=${cursor}` : ''}`) }
+  sendMessage(channelId, body) { return this.post(`/messages/${channelId}`, { body }) }
 }
 
 export const api = new ApiClient()
