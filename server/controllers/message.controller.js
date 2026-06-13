@@ -83,6 +83,30 @@ exports.sendMessage = async (req, res, next) => {
   }
 };
 
+// POST /api/messages/channels/project — create or get a project channel
+exports.getOrCreateProject = async (req, res, next) => {
+  try {
+    const { projectId, name, participantIds = [] } = req.body;
+    if (!projectId) throw new ValidationError("projectId is required");
+    if (!name?.trim()) throw new ValidationError("name is required");
+
+    let channel = await Channel.findOne({ type: "project", projectId });
+    if (!channel) {
+      const allParticipants = [...new Set([String(req.user.id), ...participantIds.map(String)])];
+      channel = await Channel.create({
+        type: "project",
+        projectId,
+        name: name.trim(),
+        participants: allParticipants,
+      });
+    }
+
+    success(res, channel);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // POST /api/messages/channels/direct — get or create a DM channel between two users
 exports.getOrCreateDirect = async (req, res, next) => {
   try {

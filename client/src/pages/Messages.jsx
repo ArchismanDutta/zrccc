@@ -19,14 +19,19 @@ function getSocket() {
 }
 
 // ─── Channel List ──────────────────────────────────────────────
-function ChannelList({ channels, activeId, onSelect, onNewDm }) {
+function ChannelList({ channels, activeId, onSelect, onNewDm, onNewChannel }) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
         <h2 className="text-sm font-semibold text-fg">Messages</h2>
-        <button onClick={onNewDm} className="btn btn-secondary text-xs gap-1 py-1 px-2">
-          <Plus size={12} /> DM
-        </button>
+        <div className="flex gap-1">
+          <button onClick={onNewChannel} className="btn btn-ghost text-xs gap-0.5 py-1 px-2" title="New project channel">
+            <Hash size={11} /> New
+          </button>
+          <button onClick={onNewDm} className="btn btn-secondary text-xs gap-1 py-1 px-2">
+            <Plus size={12} /> DM
+          </button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto py-2">
         {channels.length === 0 && (
@@ -192,6 +197,73 @@ function NewDmModal({ onClose, onCreated }) {
   )
 }
 
+// ─── New Project Channel Modal ────────────────────────────────
+function NewProjectChannelModal({ onClose, onCreated }) {
+  const [projects, setProjects] = useState([])
+  const [projectId, setProjectId] = useState('')
+  const [name, setName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.getProjects('?limit=100&status=active')
+      .then(r => setProjects(r.data?.docs || r.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleCreate = async () => {
+    if (!projectId || !name.trim()) return
+    setSaving(true)
+    try {
+      const res = await api.createProjectChannel({ projectId, name: name.trim() })
+      onCreated(res.data)
+    } catch (_) {}
+    onClose()
+    setSaving(false)
+  }
+
+  const handleProjectChange = (id) => {
+    setProjectId(id)
+    const proj = projects.find(p => p._id === id)
+    if (proj && !name) setName(proj.name)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+      <div className="card w-full max-w-sm p-4 space-y-3">
+        <h3 className="font-semibold text-fg flex items-center gap-2">
+          <Hash size={16} className="text-accent" /> New Project Channel
+        </h3>
+        {loading ? (
+          <p className="text-sm text-fg-3 text-center py-4">Loading projects…</p>
+        ) : (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-fg-2 mb-1">Project</label>
+              <select className="input text-sm" value={projectId} onChange={e => handleProjectChange(e.target.value)}>
+                <option value="">Select project…</option>
+                {projects.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-fg-2 mb-1">Channel Name</label>
+              <input className="input text-sm" placeholder="e.g. project-alpha" value={name}
+                onChange={e => setName(e.target.value)} />
+            </div>
+          </>
+        )}
+        <div className="flex gap-2">
+          <button onClick={onClose} className="btn btn-secondary flex-1 text-sm">Cancel</button>
+          <button onClick={handleCreate} disabled={saving || !projectId || !name.trim()} className="btn btn-primary flex-1 text-sm">
+            {saving ? 'Creating…' : 'Create'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ─────────────────────────────────────────────────
 export default function MessagesPage() {
   const { user } = useAuth()
@@ -200,6 +272,7 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState([])
   const [typingUsers, setTypingUsers] = useState([])
   const [showNewDm, setShowNewDm] = useState(false)
+  const [showNewChannel, setShowNewChannel] = useState(false)
   const messagesEndRef = useRef(null)
   const typingTimerRef = useRef({})
   const usersMapRef = useRef({})
@@ -298,6 +371,7 @@ export default function MessagesPage() {
             activeId={activeChannel?._id}
             onSelect={handleSelectChannel}
             onNewDm={() => setShowNewDm(true)}
+            onNewChannel={() => setShowNewChannel(true)}
           />
         </div>
 
@@ -317,6 +391,12 @@ export default function MessagesPage() {
       {showNewDm && (
         <NewDmModal
           onClose={() => setShowNewDm(false)}
+          onCreated={handleChannelCreated}
+        />
+      )}
+      {showNewChannel && (
+        <NewProjectChannelModal
+          onClose={() => setShowNewChannel(false)}
           onCreated={handleChannelCreated}
         />
       )}

@@ -154,6 +154,7 @@ class ApiClient {
   getChannels() { return this.get('/messages/channels') }
   getMessages(channelId, cursor) { return this.get(`/messages/${channelId}${cursor ? `?before=${cursor}` : ''}`) }
   sendMessage(channelId, body) { return this.post(`/messages/${channelId}`, { body }) }
+  createProjectChannel(d) { return this.post('/messages/channels/project', d) }
 }
 
 export const api = new ApiClient()
