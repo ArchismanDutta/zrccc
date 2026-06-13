@@ -52,10 +52,11 @@ function ChannelList({ channels, activeId, onSelect, onNewDm }) {
 }
 
 // ─── Message Thread ────────────────────────────────────────────
-function MessageThread({ channel, messages, onSend, typingUsers, messagesEndRef }) {
+function MessageThread({ channel, messages, onSend, typingUsers, messagesEndRef, usersMapRef }) {
   const [input, setInput] = useState('')
   const { user } = useAuth()
   const socket = getSocket()
+  const typingThrottleRef = useRef(null)
 
   const handleSend = (e) => {
     e.preventDefault()
@@ -65,7 +66,9 @@ function MessageThread({ channel, messages, onSend, typingUsers, messagesEndRef 
   }
 
   const handleTyping = () => {
+    if (!channel || typingThrottleRef.current) return
     socket.emit('message:typing', { channelId: channel._id })
+    typingThrottleRef.current = setTimeout(() => { typingThrottleRef.current = null }, 1000)
   }
 
   if (!channel) {
@@ -89,7 +92,7 @@ function MessageThread({ channel, messages, onSend, typingUsers, messagesEndRef 
         <div>
           <h3 className="text-sm font-semibold text-fg">{channel.name || 'Direct Message'}</h3>
           {typingUsers.length > 0 && (
-            <p className="text-xs text-fg-3 italic">{typingUsers.join(', ')} is typing…</p>
+            <p className="text-xs text-fg-3 italic">{typingUsers.map(id => usersMapRef.current?.[id] || 'Someone').join(', ')} is typing…</p>
           )}
         </div>
       </div>
@@ -199,7 +202,15 @@ export default function MessagesPage() {
   const [showNewDm, setShowNewDm] = useState(false)
   const messagesEndRef = useRef(null)
   const typingTimerRef = useRef({})
+  const usersMapRef = useRef({})
   const socket = getSocket()
+
+  // Seed current user into the map
+  useEffect(() => {
+    if (user?.id && user?.name) {
+      usersMapRef.current[String(user.id)] = user.name
+    }
+  }, [user])
 
   // Load channels
   useEffect(() => {
@@ -211,6 +222,9 @@ export default function MessagesPage() {
     socket.connect()
 
     socket.on('message:receive', ({ channelId, message }) => {
+      if (message.senderId?._id) {
+        usersMapRef.current[String(message.senderId._id)] = message.senderId.name
+      }
       if (activeChannel?._id === channelId || !activeChannel) {
         setMessages(prev => [...prev, message])
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
@@ -242,7 +256,13 @@ export default function MessagesPage() {
     socket.emit('channel:join', activeChannel._id)
     api.getMessages(activeChannel._id)
       .then(r => {
-        setMessages(r.data || [])
+        const msgs = r.data || []
+        msgs.forEach(msg => {
+          if (msg.senderId?._id) {
+            usersMapRef.current[String(msg.senderId._id)] = msg.senderId.name
+          }
+        })
+        setMessages(msgs)
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
       })
       .catch(() => {})
@@ -289,6 +309,7 @@ export default function MessagesPage() {
             onSend={handleSend}
             typingUsers={typingUsers}
             messagesEndRef={messagesEndRef}
+            usersMapRef={usersMapRef}
           />
         </div>
       </div>
