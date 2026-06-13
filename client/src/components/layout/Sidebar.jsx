@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Briefcase, Calendar, CheckSquare,
   DollarSign, MessageSquare, BarChart3, Settings, LogOut,
-  ChevronLeft, ChevronRight, Building2, Zap, Globe, Menu, Wallet, LifeBuoy
+  ChevronLeft, ChevronRight, Building2, Zap, Globe, Menu, Wallet, LifeBuoy, ShieldCheck
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/Avatar'
@@ -47,7 +47,8 @@ function buildNavSections(role) {
     {
       label: 'System',
       items: [
-        ...(can(role, ADMIN_ROLES) ? [{ to: '/settings', icon: Settings, label: 'Settings' }] : []),
+        ...(can(role, ADMIN_ROLES) ? [{ to: '/audit',    icon: ShieldCheck, label: 'Audit Log' }] : []),
+        ...(can(role, ADMIN_ROLES) ? [{ to: '/settings', icon: Settings,    label: 'Settings' }] : []),
       ],
     },
   ]

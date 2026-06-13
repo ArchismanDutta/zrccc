@@ -25,6 +25,7 @@ const hrRoutes           = require("./routes/hr.routes");
 const ticketRoutes       = require("./routes/ticket.routes");
 const departmentRoutes   = require("./routes/department.routes");
 const messageRoutes      = require("./routes/message.routes");
+const auditRoutes        = require("./routes/audit.routes");
 
 const app = express();
 
@@ -93,6 +94,7 @@ app.use("/api/hr",            hrRoutes);
 app.use("/api/tickets",       ticketRoutes);
 app.use("/api/departments",   departmentRoutes);
 app.use("/api/messages",      messageRoutes);
+app.use("/api/audit",         auditRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────
 app.use((req, _res, next) => {

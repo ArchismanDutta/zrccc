@@ -147,6 +147,9 @@ class ApiClient {
   assignTicket(id, d) { return this.patch(`/tickets/${id}/assign`, d) }
   addTicketReply(id, d) { return this.post(`/tickets/${id}/reply`, d) }
 
+  // Audit
+  getAuditLogs(q = '') { return this.get(`/audit${q}`) }
+
   // Messages
   getChannels() { return this.get('/messages/channels') }
   getMessages(channelId, cursor) { return this.get(`/messages/${channelId}${cursor ? `?before=${cursor}` : ''}`) }
