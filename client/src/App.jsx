@@ -54,8 +54,9 @@ function ProtectedRoutes() {
   const r = user?.role
   const isAdmin    = ['super_admin','admin'].includes(r)
   const isManager  = ['super_admin','admin','account_manager','project_manager'].includes(r)
-  const isFinance  = r === 'super_admin'
-  const isReporter = ['super_admin','admin'].includes(r)
+  const isFinance  = ['super_admin','admin'].includes(r)
+  const isReporter = ['super_admin','admin','project_manager','account_manager'].includes(r)
+  const canTickets = ['super_admin','admin','project_manager','account_manager'].includes(r)
 
   // All other roles → full admin CRM (filtered by role)
   return (
@@ -73,7 +74,7 @@ function ProtectedRoutes() {
         <Route path="messages"  element={<MessagesPage />} />
         {isReporter && <Route path="reports"  element={<ReportsPage />} />}
         {r === 'super_admin' && <Route path="salary" element={<SalaryPage />} />}
-        {isAdmin    && <Route path="tickets" element={<TicketsPage />} />}
+        {canTickets && <Route path="tickets" element={<TicketsPage />} />}
         {isAdmin    && <Route path="settings" element={<SettingsPage />} />}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
