@@ -90,16 +90,17 @@ exports.listSalaryRecords = async (req, res, next) => {
     if (year) filter.year = parseInt(year);
     if (status) filter.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const safeLimit = Math.min(parseInt(limit) || 20, 200);
+    const skip = (parseInt(page) - 1) * safeLimit;
     const [docs, total] = await Promise.all([
       SalaryRecord.find(filter)
         .populate("employeeId", "name email role departmentId avatar salary")
         .populate("paidBy", "name")
-        .sort(sort).skip(skip).limit(parseInt(limit)).lean(),
+        .sort(sort).skip(skip).limit(safeLimit).lean(),
       SalaryRecord.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: parseInt(limit) });
+    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
   } catch (err) { next(err); }
 };
 
@@ -158,10 +159,11 @@ exports.markSalaryPaid = async (req, res, next) => {
         const tableTop = doc.y;
         const col1 = 50, col2 = 400;
 
+        const totalDeductions = record.deductions.reduce((s, d) => s + (d.amount || 0), 0);
         const rows = [
-          ["Base Salary", `₹${record.baseSalary.toLocaleString("en-IN")}`],
-          ["Bonus", `₹${record.bonus.toLocaleString("en-IN")}`],
-          ["Deductions", `- ₹${record.deductions.toLocaleString("en-IN")}`],
+          ["Base Salary", `Rs.${record.baseSalary.toLocaleString("en-IN")}`],
+          ["Bonus", `Rs.${record.bonus.toLocaleString("en-IN")}`],
+          ["Deductions", `- Rs.${totalDeductions.toLocaleString("en-IN")}`],
         ];
 
         rows.forEach(([label, value], i) => {
@@ -175,7 +177,7 @@ exports.markSalaryPaid = async (req, res, next) => {
         doc.moveTo(50, netY).lineTo(545, netY).stroke();
         doc.font("Helvetica-Bold").fontSize(12);
         doc.text("Net Salary", col1, netY + 5);
-        doc.text(`₹${record.netSalary.toLocaleString("en-IN")}`, col2, netY + 5, { align: "right", width: 145 });
+        doc.text(`Rs.${record.netSalary.toLocaleString("en-IN")}`, col2, netY + 5, { align: "right", width: 145 });
         doc.moveDown(2);
 
         // Payment details
