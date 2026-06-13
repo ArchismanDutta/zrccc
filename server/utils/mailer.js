@@ -3,6 +3,7 @@
 // All functions are fire-and-forget — errors are logged but never thrown.
 const nodemailer = require("nodemailer");
 const path = require("path");
+const { escapeHtml } = require("./sanitize");
 
 // ── Transporter Setup ────────────────────────────────────────
 let transporter = null;
@@ -52,10 +53,10 @@ async function sendInvoiceEmail(invoice, client) {
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #1a1a2e;">Invoice from ZRC Media Network</h2>
-        <p>Dear ${client.contactName || client.companyName},</p>
+        <p>Dear ${escapeHtml(client.contactName || client.companyName)},</p>
         <p>Please find details of your invoice below:</p>
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-          <tr style="background: #f5f5f5;"><td style="padding: 10px; font-weight: bold;">Invoice Number</td><td style="padding: 10px;">${invoice.invoiceNumber}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding: 10px; font-weight: bold;">Invoice Number</td><td style="padding: 10px;">${escapeHtml(invoice.invoiceNumber)}</td></tr>
           <tr><td style="padding: 10px; font-weight: bold;">Amount</td><td style="padding: 10px;">₹${(invoice.totalAmount || 0).toLocaleString("en-IN")}</td></tr>
           <tr style="background: #f5f5f5;"><td style="padding: 10px; font-weight: bold;">Due Date</td><td style="padding: 10px;">${invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString("en-IN") : "N/A"}</td></tr>
         </table>
@@ -80,8 +81,8 @@ async function sendPaymentReminderEmail(invoice, client) {
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #e74c3c;">Payment Reminder</h2>
-        <p>Dear ${client.contactName || client.companyName},</p>
-        <p>This is a friendly reminder that your invoice <strong>${invoice.invoiceNumber}</strong> is <strong>${daysOverdue} day(s) overdue</strong>.</p>
+        <p>Dear ${escapeHtml(client.contactName || client.companyName)},</p>
+        <p>This is a friendly reminder that your invoice <strong>${escapeHtml(invoice.invoiceNumber)}</strong> is <strong>${daysOverdue} day(s) overdue</strong>.</p>
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
           <tr style="background: #fff3f3;"><td style="padding: 10px; font-weight: bold;">Outstanding Amount</td><td style="padding: 10px; color: #e74c3c; font-weight: bold;">₹${outstanding.toLocaleString("en-IN")}</td></tr>
           <tr><td style="padding: 10px; font-weight: bold;">Due Date</td><td style="padding: 10px;">${new Date(invoice.dueDate).toLocaleDateString("en-IN")}</td></tr>
@@ -106,11 +107,11 @@ async function sendPaymentReceivedEmail(invoice, client, payment) {
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #27ae60;">Payment Received</h2>
-        <p>Dear ${client.contactName || client.companyName},</p>
+        <p>Dear ${escapeHtml(client.contactName || client.companyName)},</p>
         <p>We've received your payment. Thank you!</p>
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
           <tr style="background: #f0faf0;"><td style="padding: 10px; font-weight: bold;">Amount Received</td><td style="padding: 10px;">₹${(payment.amount || 0).toLocaleString("en-IN")}</td></tr>
-          <tr><td style="padding: 10px; font-weight: bold;">Invoice</td><td style="padding: 10px;">${invoice.invoiceNumber}</td></tr>
+          <tr><td style="padding: 10px; font-weight: bold;">Invoice</td><td style="padding: 10px;">${escapeHtml(invoice.invoiceNumber)}</td></tr>
           <tr style="background: #f0faf0;"><td style="padding: 10px; font-weight: bold;">Remaining Balance</td><td style="padding: 10px;">${remaining > 0 ? "₹" + remaining.toLocaleString("en-IN") : "Fully Paid ✓"}</td></tr>
         </table>
         <p style="color: #666; font-size: 12px;">— ZRC Media Network</p>
@@ -145,12 +146,12 @@ async function sendSalaryPaidEmail(employee, salaryRecord) {
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #1a1a2e;">Salary Payment Confirmation</h2>
-        <p>Dear ${employee.name},</p>
+        <p>Dear ${escapeHtml(employee.name)},</p>
         <p>Your salary for <strong>${monthNames[salaryRecord.month - 1]} ${salaryRecord.year}</strong> has been processed.</p>
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
           <tr style="background: #f5f5f5;"><td style="padding: 10px; font-weight: bold;">Net Salary</td><td style="padding: 10px; font-weight: bold;">₹${salaryRecord.netSalary.toLocaleString("en-IN")}</td></tr>
-          <tr><td style="padding: 10px; font-weight: bold;">Payment Method</td><td style="padding: 10px;">${(salaryRecord.paymentMethod || "").replace("_", " ").toUpperCase()}</td></tr>
-          <tr style="background: #f5f5f5;"><td style="padding: 10px; font-weight: bold;">Transaction Ref</td><td style="padding: 10px;">${salaryRecord.transactionRef || "N/A"}</td></tr>
+          <tr><td style="padding: 10px; font-weight: bold;">Payment Method</td><td style="padding: 10px;">${escapeHtml((salaryRecord.paymentMethod || "").replace("_", " ").toUpperCase())}</td></tr>
+          <tr style="background: #f5f5f5;"><td style="padding: 10px; font-weight: bold;">Transaction Ref</td><td style="padding: 10px;">${escapeHtml(salaryRecord.transactionRef || "N/A")}</td></tr>
         </table>
         <p>${attachments.length > 0 ? "Your payslip is attached to this email." : ""}</p>
         <p style="color: #666; font-size: 12px;">— ZRC Media Network</p>
@@ -170,14 +171,14 @@ async function sendNewTicketEmail(ticket, client, accountManager) {
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #e67e22;">New Support Ticket</h2>
-        <p>A new ticket has been raised by <strong>${client.companyName || client.displayName}</strong>.</p>
+        <p>A new ticket has been raised by <strong>${escapeHtml(client.companyName || client.displayName)}</strong>.</p>
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-          <tr style="background: #fff8f0;"><td style="padding: 10px; font-weight: bold;">Ticket ID</td><td style="padding: 10px;">${ticket.ticketId}</td></tr>
-          <tr><td style="padding: 10px; font-weight: bold;">Title</td><td style="padding: 10px;">${ticket.title}</td></tr>
-          <tr style="background: #fff8f0;"><td style="padding: 10px; font-weight: bold;">Priority</td><td style="padding: 10px;">${(ticket.priority || "medium").toUpperCase()}</td></tr>
+          <tr style="background: #fff8f0;"><td style="padding: 10px; font-weight: bold;">Ticket ID</td><td style="padding: 10px;">${escapeHtml(ticket.ticketId)}</td></tr>
+          <tr><td style="padding: 10px; font-weight: bold;">Title</td><td style="padding: 10px;">${escapeHtml(ticket.title)}</td></tr>
+          <tr style="background: #fff8f0;"><td style="padding: 10px; font-weight: bold;">Priority</td><td style="padding: 10px;">${escapeHtml((ticket.priority || "medium").toUpperCase())}</td></tr>
         </table>
         <p><strong>Description:</strong></p>
-        <p style="padding: 15px; background: #f9f9f9; border-radius: 8px;">${ticket.description}</p>
+        <p style="padding: 15px; background: #f9f9f9; border-radius: 8px;">${escapeHtml(ticket.description)}</p>
         <p style="color: #666; font-size: 12px;">— ZRC Media Network CRM</p>
       </div>
     `,
@@ -195,10 +196,10 @@ async function sendTicketReplyEmail(ticket, client, reply) {
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #1a1a2e;">Ticket Update</h2>
-        <p>Dear ${client.contactName || client.companyName},</p>
-        <p>A reply has been posted on your support ticket <strong>${ticket.ticketId}</strong>:</p>
+        <p>Dear ${escapeHtml(client.contactName || client.companyName)},</p>
+        <p>A reply has been posted on your support ticket <strong>${escapeHtml(ticket.ticketId)}</strong>:</p>
         <div style="padding: 15px; background: #f5f5f5; border-left: 4px solid #3498db; border-radius: 4px; margin: 20px 0;">
-          ${reply.message}
+          ${escapeHtml(reply.message)}
         </div>
         <p>You can reply from the client portal to continue the conversation.</p>
         <p style="color: #666; font-size: 12px;">— ZRC Media Network</p>
