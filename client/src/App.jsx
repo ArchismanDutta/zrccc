@@ -12,7 +12,8 @@ import ClientDetailPage from '@/pages/ClientDetail'
 import ProjectsPage     from '@/pages/Projects'
 import ProjectDetailPage from '@/pages/ProjectDetail'
 import ContentPage   from '@/pages/Content'
-import TasksPage     from '@/pages/Tasks'
+import TasksPage       from '@/pages/Tasks'
+import TaskDetailPage  from '@/pages/TaskDetail'
 import FinancePage   from '@/pages/Finance'
 import MessagesPage  from '@/pages/Messages'
 import ReportsPage   from '@/pages/Reports'
@@ -77,6 +78,7 @@ function ProtectedRoutes() {
         <Route path="projects/:id" element={<ProjectDetailPage />} />
         <Route path="content"   element={<ContentPage />} />
         <Route path="tasks"     element={<TasksPage />} />
+        <Route path="tasks/:id" element={<TaskDetailPage />} />
         {isFinance  && <Route path="finance"  element={<FinancePage />} />}
         <Route path="messages"  element={<MessagesPage />} />
         {isReporter && <Route path="reports"  element={<ReportsPage />} />}

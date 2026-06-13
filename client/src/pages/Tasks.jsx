@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Search, CheckCircle2, Clock, AlertTriangle, RotateCcw, ChevronDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/Cards'
 import { PriorityBadge, StatusBadge } from '@/components/ui/Badge'
@@ -145,6 +146,7 @@ function TaskForm({ form, setForm, users, projects }) {
 
 // ─── Main Page ────────────────────────────────────────────────
 export default function TasksPage() {
+  const navigate = useNavigate()
   const { toast } = useToast()
   const { user: me } = useAuth()
   const [tasks, setTasks]       = useState([])
@@ -310,7 +312,7 @@ export default function TasksPage() {
                     return (
                       <div key={task._id}
                         className="card p-3 sm:p-3.5 cursor-pointer hover:border-[var(--color-accent-ring)] transition-colors"
-                        onClick={() => openEdit(task)}>
+                        onClick={() => navigate(`/tasks/${task._id}`)}>
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <p className="text-[13px] sm:text-sm font-medium text-fg leading-snug">{task.title}</p>
                           <PriorityBadge priority={task.priority} />
@@ -354,7 +356,7 @@ export default function TasksPage() {
                 const isDue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done'
                 const a = t.assignedTo?.[0]
                 return (
-                  <tr key={t._id} className="cursor-pointer" onClick={() => openEdit(t)}>
+                  <tr key={t._id} className="cursor-pointer" onClick={() => navigate(`/tasks/${t._id}`)}>
                     <td>
                       <p className="font-medium text-fg whitespace-nowrap">{t.title}</p>
                       {t.description && <p className="text-xs text-fg-3 mt-0.5 max-w-[200px] truncate">{t.description}</p>}

@@ -76,6 +76,9 @@ class ApiClient {
   createTask(d) { return this.post('/tasks', d) }
   updateTask(id, d) { return this.patch(`/tasks/${id}`, d) }
   changeTaskStatus(id, d) { return this.patch(`/tasks/${id}/status`, d) }
+  addProgressUpdate(id, d) { return this.post(`/tasks/${id}/progress`, d) }
+  addIssueReport(id, d) { return this.post(`/tasks/${id}/issues`, d) }
+  submitTaskReview(id, d) { return this.post(`/tasks/${id}/review`, d) }
 
   // Content
   getContent(q = '') { return this.get(`/content${q}`) }
