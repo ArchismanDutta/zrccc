@@ -3,6 +3,8 @@ const http       = require("http");
 const { PORT }   = require("./config/env");
 const connectDB  = require("./config/db");
 const app        = require("./app");
+const User       = require("./models/User");
+const Channel    = require("./models/Channel");
 
 async function start() {
   try {
@@ -26,7 +28,7 @@ async function start() {
     });
 
     // Socket.io auth middleware — reads JWT from cookie or auth handshake
-    io.use((socket, next) => {
+    io.use(async (socket, next) => {
       try {
         const token = socket.handshake.auth?.token ||
           socket.handshake.headers?.cookie?.split(";")
@@ -34,10 +36,21 @@ async function start() {
             .find(c => c.startsWith("accessToken="))
             ?.split("=")[1];
         if (!token) return next(new Error("No token"));
+
         const decoded = jwt.verify(token, JWT_ACCESS_SECRET);
+
+        const user = await User.findById(decoded.id)
+          .select("isActive tokenVersion")
+          .lean();
+
+        if (!user || !user.isActive) return next(new Error("Account deactivated"));
+        if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+          return next(new Error("Session invalidated"));
+        }
+
         socket.userId = String(decoded.id);
         next();
-      } catch (_) {
+      } catch (err) {
         next(new Error("Invalid token"));
       }
     });
@@ -46,12 +59,42 @@ async function start() {
       // Join personal room
       socket.join(socket.userId);
 
-      socket.on("channel:join", (channelId) => {
-        socket.join(channelId);
+      socket.on("channel:join", async (channelId) => {
+        try {
+          const channel = await Channel.findById(channelId).select("participants").lean();
+          if (!channel) return;
+          const isParticipant = channel.participants.some(p => String(p) === socket.userId);
+          if (isParticipant) socket.join(channelId);
+        } catch (_) {}
       });
 
       socket.on("channel:leave", (channelId) => {
         socket.leave(channelId);
+      });
+
+      socket.on("message:send", async ({ channelId, body }) => {
+        try {
+          if (!body?.trim()) return;
+          const channel = await Channel.findById(channelId);
+          if (!channel) return;
+          if (!channel.participants.some(p => String(p) === socket.userId)) return;
+
+          const Message = require("./models/Message");
+          const message = await Message.create({
+            channelId,
+            senderId: socket.userId,
+            body: body.trim(),
+            readBy: [socket.userId],
+          });
+
+          channel.lastMessage = body.trim().slice(0, 100);
+          channel.lastAt = new Date();
+          await channel.save();
+
+          const populated = await message.populate("senderId", "name avatar");
+
+          io.to(channelId).emit("message:receive", { channelId, message: populated });
+        } catch (_) {}
       });
 
       socket.on("message:typing", ({ channelId }) => {
