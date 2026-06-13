@@ -2,7 +2,7 @@
 const Client = require("../models/Client");
 const { nextSequence } = require("../models/Counter");
 const { success, created, paginated } = require("../utils/response");
-const { ValidationError, NotFoundError } = require("../utils/errors");
+const { ValidationError, NotFoundError, ForbiddenError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
 
 // POST /api/clients
@@ -94,6 +94,14 @@ exports.getClient = async (req, res, next) => {
       .lean();
     if (!client || client.isArchived) throw new NotFoundError("Client");
 
+    // For account_manager role — only their own clients
+    if (req.user.role === "account_manager" && !req.user.permissions.includes("clients:read:all")) {
+      const amId = client.accountManagerId?._id ?? client.accountManagerId;
+      if (String(amId) !== String(req.user.id)) {
+        throw new ForbiddenError("You can only access your own clients");
+      }
+    }
+
     success(res, client);
   } catch (err) {
     next(err);
@@ -106,15 +114,33 @@ exports.updateClient = async (req, res, next) => {
     const client = await Client.findById(req.params.id);
     if (!client || client.isArchived) throw new NotFoundError("Client");
 
+    // For account_manager role — only their own clients
+    if (req.user.role === "account_manager" && !req.user.permissions.includes("clients:read:all")) {
+      if (String(client.accountManagerId) !== String(req.user.id)) {
+        throw new ForbiddenError("You can only access your own clients");
+      }
+    }
+
     const allowed = [
       "companyName", "displayName", "contactName", "contactEmail", "contactPhone",
       "website", "industry", "region", "gstNumber", "panNumber", "billingAddress",
       "services", "contract", "priority", "healthScore", "tags", "notes",
-      "lastContactedAt", "nextFollowUpAt", "logo",
+      "lastContactedAt", "nextFollowUpAt", "logo", "accountManagerId",
     ];
 
+    // Build update data from allowed fields
+    const data = {};
     for (const key of allowed) {
-      if (req.body[key] !== undefined) client[key] = req.body[key];
+      if (req.body[key] !== undefined) data[key] = req.body[key];
+    }
+
+    // Only admins may reassign a client to a different account manager
+    if (data.accountManagerId && !["super_admin", "admin"].includes(req.user.role)) {
+      delete data.accountManagerId;
+    }
+
+    for (const key of Object.keys(data)) {
+      client[key] = data[key];
     }
 
     await client.save();

@@ -5,7 +5,7 @@ const Client  = require("../models/Client");
 const Project = require("../models/Project");
 const { nextSequence } = require("../models/Counter");
 const { success, created, paginated } = require("../utils/response");
-const { ValidationError, NotFoundError } = require("../utils/errors");
+const { ValidationError, NotFoundError, ForbiddenError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
 
 // ── Invoices ─────────────────────────────────────────────────
@@ -170,6 +170,13 @@ exports.listPayments = async (req, res, next) => {
     if (clientId) filter.clientId = clientId;
     if (invoiceId) filter.invoiceId = invoiceId;
 
+    // If account_manager role, filter to their clients only
+    if (req.user.role === "account_manager") {
+      const myClients = await Client.find({ accountManagerId: req.user.id }).select("_id").lean();
+      const myClientIds = myClients.map(c => c._id);
+      filter.clientId = { $in: myClientIds };
+    }
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const [docs, total] = await Promise.all([
       Payment.find(filter).populate("loggedBy", "name").sort(sort).skip(skip).limit(parseInt(limit)).lean(),
@@ -221,6 +228,14 @@ exports.downloadInvoicePdf = async (req, res, next) => {
       .populate("clientId", "companyName displayName contactName contactEmail")
       .lean();
     if (!invoice) throw new NotFoundError("Invoice");
+
+    // For client role, verify invoice belongs to their linked client
+    if (req.user.role === "client") {
+      if (String(invoice.clientId) !== String(req.user.linkedClientId)) {
+        throw new ForbiddenError("Access denied");
+      }
+    }
+
     const { generateInvoicePdf } = require("../utils/invoicePdf");
     generateInvoicePdf(invoice, res);
   } catch (err) { next(err); }
