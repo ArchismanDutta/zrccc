@@ -91,7 +91,6 @@ exports.getClient = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id)
       .populate("accountManagerId", "name email avatar")
-      .populate("portalUserId", "name email")
       .lean();
     if (!client || client.isArchived) throw new NotFoundError("Client");
 

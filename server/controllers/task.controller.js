@@ -15,7 +15,7 @@ exports.createTask = async (req, res, next) => {
 
     const task = await Task.create({
       taskId, title, description: req.body.description || "", category,
-      projectId: req.body.projectId || null, phaseId: req.body.phaseId || null,
+      projectId: req.body.projectId || null,
       contentItemId: req.body.contentItemId || null,
       assignedTo: assignedTo || [], assignedBy: req.user.id,
       priority: req.body.priority || "medium", dueDate: req.body.dueDate || null,

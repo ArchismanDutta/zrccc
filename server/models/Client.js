@@ -78,10 +78,6 @@ const clientSchema = new mongoose.Schema({
   nextFollowUpAt:  { type: Date },
   churnReason:   { type: String, default: "" },
 
-  // Portal
-  portalUserId:  { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-  portalEnabled: { type: Boolean, default: false },
-
   // Social media metrics history
   socialMetrics: [{
     platform:   { type: String, enum: ["instagram", "facebook", "youtube", "linkedin"], required: true },
