@@ -227,6 +227,35 @@ async function sendPasswordResetEmail(user, resetUrl) {
   });
 }
 
+// ── 8. Content Awaiting Client Approval ─────────────────────
+async function sendContentApprovalEmail(client, contentItem, portalUrl) {
+  const safeName    = escapeHtml(client.contactName || client.companyName);
+  const safeTitle   = escapeHtml(contentItem.title);
+  const safeType    = escapeHtml((contentItem.contentType || "").replace(/_/g, " "));
+  await sendMail({
+    to: client.contactEmail,
+    subject: `Content Ready for Your Approval — ${safeTitle}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
+        <h2 style="color:#1a1a2e">Content Awaiting Your Approval</h2>
+        <p>Hi ${safeName},</p>
+        <p>A new piece of content is ready for your review and approval:</p>
+        <div style="padding:15px;background:#f5f5f5;border-left:4px solid #4f46e5;border-radius:4px;margin:20px 0">
+          <strong>${safeTitle}</strong><br/>
+          <span style="color:#666;font-size:13px">${safeType}</span>
+        </div>
+        <p>Please log in to your client portal to review and approve or request changes:</p>
+        <p>
+          <a href="${portalUrl}" style="background:#4f46e5;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">
+            Review Content
+          </a>
+        </p>
+        <p style="color:#888;font-size:12px">— ZRC Media Network</p>
+      </div>
+    `,
+  });
+}
+
 // ── Overdue Invoice Reminder Cron ────────────────────────────
 function startOverdueReminder() {
   const Invoice = require("../models/Invoice");
@@ -276,5 +305,6 @@ module.exports = {
   sendNewTicketEmail,
   sendTicketReplyEmail,
   sendPasswordResetEmail,
+  sendContentApprovalEmail,
   startOverdueReminder,
 };

@@ -1,9 +1,12 @@
 // controllers/content.controller.js
 const ContentItem = require("../models/ContentItem");
+const Client = require("../models/Client");
 const { nextSequence } = require("../models/Counter");
 const { success, created, paginated } = require("../utils/response");
 const { ValidationError, NotFoundError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
+const { sendContentApprovalEmail } = require("../utils/mailer");
+const { FRONTEND_ORIGINS } = require("../config/env");
 
 exports.createContent = async (req, res, next) => {
   try {
@@ -131,6 +134,17 @@ exports.approveContent = async (req, res, next) => {
     await item.save();
 
     await logAudit({ action: "content.approve", entity: "ContentItem", entityId: item._id, userId: req.user.id, req });
+
+    if (newStatus === "awaiting_client" && item.clientId) {
+      try {
+        const client = await Client.findById(item.clientId).lean();
+        if (client?.contactEmail) {
+          const portalBase = (FRONTEND_ORIGINS[0] || "http://localhost:5173") + "/portal";
+          await sendContentApprovalEmail(client, item, portalBase + "/content");
+        }
+      } catch (_) { /* email failure must never break the response */ }
+    }
+
     success(res, item);
   } catch (err) { next(err); }
 };
