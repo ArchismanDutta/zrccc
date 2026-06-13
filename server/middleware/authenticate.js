@@ -40,13 +40,15 @@ function bustTokenCache(userId) {
 
 const authenticate = async (req, _res, next) => {
   try {
-    const header = req.headers.authorization;
-    if (!header?.startsWith("Bearer ")) {
-      return next(new AuthenticationError("No token provided"));
+    // Cookie first (httpOnly), fallback to Bearer header
+    let token = req.cookies?.accessToken;
+    if (!token) {
+      const header = req.headers.authorization;
+      if (header?.startsWith("Bearer ")) {
+        token = header.split(" ")[1].trim();
+      }
     }
-
-    const token = header.split(" ")[1].trim();
-    if (!token) return next(new AuthenticationError("Malformed authorization header"));
+    if (!token) return next(new AuthenticationError("No token provided"));
 
     const decoded = jwt.verify(token, JWT_ACCESS_SECRET);
 

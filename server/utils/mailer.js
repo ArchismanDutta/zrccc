@@ -208,6 +208,25 @@ async function sendTicketReplyEmail(ticket, client, reply) {
   });
 }
 
+// ── 7. Password Reset ────────────────────────────────────────
+async function sendPasswordResetEmail(user, resetUrl) {
+  const safeName = escapeHtml(user.name);
+  await sendMail({
+    to: user.email,
+    subject: "Password Reset Request — ZRC Media Network",
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
+        <h2 style="color:#1a1a2e">Password Reset</h2>
+        <p>Hi ${safeName},</p>
+        <p>We received a request to reset your password. Click the link below to set a new password (valid for 1 hour):</p>
+        <p><a href="${resetUrl}" style="background:#4f46e5;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Reset Password</a></p>
+        <p>If you did not request a password reset, you can safely ignore this email.</p>
+        <p style="color:#888;font-size:12px">This link expires in 1 hour.</p>
+      </div>
+    `,
+  });
+}
+
 // ── Overdue Invoice Reminder Cron ────────────────────────────
 function startOverdueReminder() {
   const Invoice = require("../models/Invoice");
@@ -256,5 +275,6 @@ module.exports = {
   sendSalaryPaidEmail,
   sendNewTicketEmail,
   sendTicketReplyEmail,
+  sendPasswordResetEmail,
   startOverdueReminder,
 };

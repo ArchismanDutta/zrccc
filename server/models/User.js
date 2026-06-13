@@ -22,6 +22,13 @@ const userSchema = new mongoose.Schema({
   // Token versioning — bump to invalidate all existing JWTs
   tokenVersion: { type: Number, default: 0 },
 
+  // Password reset
+  passwordResetToken:   { type: String, default: null },
+  passwordResetExpires: { type: Date,   default: null },
+
+  // Refresh token rotation (hashed)
+  refreshTokenHash: { type: String, default: null, select: false },
+
   // Client portal link (only for role = "client")
   linkedClientId: { type: mongoose.Schema.Types.ObjectId, ref: "Client", default: null },
 
