@@ -60,17 +60,18 @@ exports.listProjects = async (req, res, next) => {
       ];
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const safeLimit = Math.min(parseInt(limit) || 20, 200);
+    const skip = (parseInt(page) - 1) * safeLimit;
     const [docs, total] = await Promise.all([
       Project.find(filter)
         .populate("clientId", "companyName displayName")
         .populate("projectManagerId", "name avatar")
         .populate("teamMembers.userId", "name avatar role")
-        .sort(sort).skip(skip).limit(parseInt(limit)).lean(),
+        .sort(sort).skip(skip).limit(safeLimit).lean(),
       Project.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: parseInt(limit) });
+    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
   } catch (err) { next(err); }
 };
 
@@ -186,8 +187,8 @@ exports.toggleMilestone = async (req, res, next) => {
     if (!project) throw new NotFoundError("Project");
     const milestone = project.milestones.id(req.params.milestoneId);
     if (!milestone) throw new NotFoundError("Milestone");
-    milestone.completed = !milestone.completed;
-    milestone.completedAt = milestone.completed ? new Date() : null;
+    milestone.isCompleted = !milestone.isCompleted;
+    milestone.completedAt = milestone.isCompleted ? new Date() : null;
     await project.save();
     success(res, project);
   } catch (err) { next(err); }
