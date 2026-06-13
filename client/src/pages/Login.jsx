@@ -54,6 +54,13 @@ export default function LoginPage() {
             </div>
           </div>
 
+          <div className="text-right">
+            <button type="button" onClick={() => window.location.href = '/forgot-password'}
+              className="text-xs text-accent hover:underline">
+              Forgot password?
+            </button>
+          </div>
+
           <button type="submit" disabled={loading} className="btn btn-primary w-full gap-2 py-2.5">
             {loading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <LogIn size={16} />}
             {loading ? 'Signing in…' : 'Sign In'}

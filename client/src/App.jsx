@@ -3,7 +3,9 @@ import { AuthProvider, useAuth } from '@/lib/auth'
 import { ToastProvider } from '@/components/ui/Toast'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ClientLayout } from '@/components/layout/ClientLayout'
-import LoginPage     from '@/pages/Login'
+import LoginPage          from '@/pages/Login'
+import ForgotPasswordPage from '@/pages/ForgotPassword'
+import ResetPasswordPage  from '@/pages/ResetPassword'
 import DashboardPage from '@/pages/Dashboard'
 import ClientsPage      from '@/pages/Clients'
 import ClientDetailPage from '@/pages/ClientDetail'
@@ -32,7 +34,12 @@ function ProtectedRoutes() {
     </div>
   )
 
-  if (!isAuthenticated) return <LoginPage />
+  if (!isAuthenticated) {
+    const path = window.location.pathname
+    if (path === '/forgot-password') return <ForgotPasswordPage />
+    if (path === '/reset-password')  return <ResetPasswordPage />
+    return <LoginPage />
+  }
 
   // Client role → restricted portal
   if (user?.role === 'client') {
