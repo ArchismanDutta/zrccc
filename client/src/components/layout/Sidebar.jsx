@@ -11,7 +11,9 @@ import { useAuth } from '@/lib/auth'
 
 const ADMIN_ROLES    = ['super_admin', 'admin']
 const MANAGER_ROLES  = ['super_admin', 'admin', 'account_manager', 'project_manager']
-const REPORT_ROLES   = ['super_admin', 'admin']
+const REPORT_ROLES   = ['super_admin', 'admin', 'project_manager', 'account_manager']
+const TICKET_ROLES   = ['super_admin', 'admin', 'project_manager', 'account_manager']
+const FINANCE_ROLES  = ['super_admin', 'admin']
 
 function can(role, allowedRoles) { return allowedRoles.includes(role) }
 
@@ -35,9 +37,9 @@ function buildNavSections(role) {
     {
       label: 'Business',
       items: [
-        ...(role === 'super_admin'    ? [{ to: '/finance',  icon: DollarSign,   label: 'Finance' }]  : []),
+        ...(can(role, FINANCE_ROLES)  ? [{ to: '/finance',  icon: DollarSign,   label: 'Finance' }]  : []),
         ...(role === 'super_admin'    ? [{ to: '/salary',   icon: Wallet,        label: 'Salary' }]   : []),
-        ...(can(role, ADMIN_ROLES)    ? [{ to: '/tickets',  icon: LifeBuoy,      label: 'Tickets' }]  : []),
+        ...(can(role, TICKET_ROLES)   ? [{ to: '/tickets',  icon: LifeBuoy,      label: 'Tickets' }]  : []),
         { to: '/messages', icon: MessageSquare, label: 'Messages' },
         ...(can(role, REPORT_ROLES)   ? [{ to: '/reports',  icon: BarChart3,     label: 'Reports' }]  : []),
       ],
