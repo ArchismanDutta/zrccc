@@ -7,6 +7,7 @@ const ContentItem = require("../models/ContentItem");
 const Invoice     = require("../models/Invoice");
 const Payment     = require("../models/Payment");
 const { success } = require("../utils/response");
+const { ForbiddenError } = require("../utils/errors");
 
 exports.getDashboard = async (req, res, next) => {
   try {
@@ -294,6 +295,14 @@ exports.getClientStats = async (req, res, next) => {
   try {
     const clientId = req.params.id;
     const mongoose = require("mongoose");
+
+    // Ownership check: users with only reports:read:own may only view their own clients
+    if (!req.user.permissions.includes("reports:read:all")) {
+      const client = await Client.findById(clientId).select("accountManagerId").lean();
+      if (!client || String(client.accountManagerId) !== String(req.user.id)) {
+        return next(new ForbiddenError("You can only view stats for your own clients"));
+      }
+    }
 
     const [invoiceAgg] = await Invoice.aggregate([
       { $match: { clientId: new mongoose.Types.ObjectId(clientId) } },
