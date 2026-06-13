@@ -6,6 +6,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import { THEME_PRESETS, applyTheme, saveTheme, setDarkMode } from '@/lib/theme'
+import { useAuth } from '@/lib/auth'
 import api from '@/lib/api'
 
 const SETTINGS_NAV = [
@@ -280,6 +281,43 @@ function TeamSection() {
   )
 }
 
+// ─── Security ─────────────────────────────────────────────────
+function SecuritySection() {
+  const { toast } = useToast()
+  const { logout } = useAuth()
+  const [revoking, setRevoking] = useState(false)
+
+  const handleRevokeAll = async () => {
+    if (!confirm('Sign out of all devices? This will end all active sessions.')) return
+    setRevoking(true)
+    try {
+      await api.revokeAllSessions()
+      toast.success('All sessions revoked. Please sign in again.')
+      setTimeout(() => logout(), 1500)
+    } catch (err) {
+      toast.error(err.message || 'Failed to revoke sessions')
+    } finally { setRevoking(false) }
+  }
+
+  return (
+    <div className="space-y-4">
+      <SectionCard title="Session Management" subtitle="Control access to your account across all devices">
+        <div className="space-y-4">
+          <p className="text-sm text-fg-2">
+            Signing out of all devices will immediately invalidate all active sessions,
+            including the current one. You will need to sign in again.
+          </p>
+          <button onClick={handleRevokeAll} disabled={revoking}
+            className="btn btn-secondary text-sm gap-2"
+            style={{ color: 'var(--color-danger, #ef4444)', borderColor: 'var(--color-danger, #ef4444)' }}>
+            {revoking ? 'Revoking…' : 'Sign Out of All Devices'}
+          </button>
+        </div>
+      </SectionCard>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────
 export default function SettingsPage() {
   const [active, setActive] = useState('appearance')
@@ -308,7 +346,8 @@ export default function SettingsPage() {
             <AppearanceSection currentThemeId={themeId} onThemeChange={setThemeId} isDark={isDark} onDarkChange={setIsDark} />
           )}
           {active === 'team' && <TeamSection />}
-          {active !== 'appearance' && active !== 'team' && (
+          {active === 'security' && <SecuritySection />}
+          {active !== 'appearance' && active !== 'team' && active !== 'security' && (
             <div className="card p-8 text-center">
               <p className="text-fg-3">This section is under construction — coming soon!</p>
             </div>
