@@ -10,8 +10,8 @@ router.post("/register",             authenticate, authorize("users:create"), au
 router.post("/refresh",              auth.refreshToken);
 router.post("/logout",               auth.logout);
 router.get( "/me",                   authenticate, auth.getMe);
-router.post("/forgot-password",      auth.forgotPassword);
-router.post("/reset-password",       auth.resetPassword);
+router.post("/forgot-password",      loginLimiter, auth.forgotPassword);
+router.post("/reset-password",       loginLimiter, auth.resetPassword);
 router.post("/revoke-all-sessions",  authenticate, auth.revokeAllSessions);
 
 module.exports = router;

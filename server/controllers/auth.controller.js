@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const jwt  = require("jsonwebtoken");
 const User = require("../models/User");
 const { nextSequence } = require("../models/Counter");
-const { JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, JWT_ACCESS_EXPIRES, JWT_REFRESH_EXPIRES, RESET_TOKEN_SECRET, IS_PRODUCTION, FRONTEND_ORIGINS } = require("../config/env");
+const { JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, JWT_ACCESS_EXPIRES, JWT_REFRESH_EXPIRES, IS_PRODUCTION, FRONTEND_ORIGINS } = require("../config/env");
 const { ROLE_LEVELS } = require("../config/roles");
 const { success, error: sendError } = require("../utils/response");
 const { ValidationError, AuthenticationError, NotFoundError } = require("../utils/errors");
@@ -158,8 +158,8 @@ exports.refreshToken = async (req, res, next) => {
       user.refreshTokenHash = null;
       await user.save();
       bustTokenCache(String(user._id));
-      res.clearCookie("accessToken");
-      res.clearCookie("refreshToken");
+      res.clearCookie("accessToken",  { httpOnly: true, secure: IS_PRODUCTION, sameSite: "strict" });
+      res.clearCookie("refreshToken", { httpOnly: true, secure: IS_PRODUCTION, sameSite: "strict" });
       throw new AuthenticationError("Session invalidated due to token reuse");
     }
 
