@@ -54,17 +54,18 @@ exports.listTasks = async (req, res, next) => {
       ];
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const safeLimit = Math.min(parseInt(limit) || 20, 200);
+    const skip = (parseInt(page) - 1) * safeLimit;
     const [docs, total] = await Promise.all([
       Task.find(filter)
         .populate("assignedTo", "name avatar role")
         .populate("assignedBy", "name")
         .populate("projectId", "name projectId")
-        .sort(sort).skip(skip).limit(parseInt(limit)).lean(),
+        .sort(sort).skip(skip).limit(safeLimit).lean(),
       Task.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: parseInt(limit) });
+    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
   } catch (err) { next(err); }
 };
 

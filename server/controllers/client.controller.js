@@ -68,18 +68,19 @@ exports.listClients = async (req, res, next) => {
       ];
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const safeLimit = Math.min(parseInt(limit) || 20, 200);
+    const skip = (parseInt(page) - 1) * safeLimit;
     const [docs, total] = await Promise.all([
       Client.find(filter)
         .populate("accountManagerId", "name email avatar")
         .sort(sort)
         .skip(skip)
-        .limit(parseInt(limit))
+        .limit(safeLimit)
         .lean(),
       Client.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: parseInt(limit) });
+    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
   } catch (err) {
     next(err);
   }

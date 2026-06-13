@@ -64,17 +64,18 @@ exports.listTickets = async (req, res, next) => {
     if (status) filter.status = status;
     if (priority) filter.priority = priority;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const safeLimit = Math.min(parseInt(limit) || 20, 200);
+    const skip = (parseInt(page) - 1) * safeLimit;
     const [docs, total] = await Promise.all([
       SupportTicket.find(filter)
         .populate("clientId", "companyName displayName")
         .populate("raisedBy", "name avatar")
         .populate("assignedTo", "name avatar")
-        .sort(sort).skip(skip).limit(parseInt(limit)).lean(),
+        .sort(sort).skip(skip).limit(safeLimit).lean(),
       SupportTicket.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: parseInt(limit) });
+    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
   } catch (err) { next(err); }
 };
 

@@ -56,17 +56,18 @@ exports.listContent = async (req, res, next) => {
       filter.clientId = req.user.linkedClientId;
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const safeLimit = Math.min(parseInt(limit) || 20, 200);
+    const skip = (parseInt(page) - 1) * safeLimit;
     const [docs, total] = await Promise.all([
       ContentItem.find(filter)
         .populate("assignedTo", "name avatar role")
         .populate("clientId", "companyName displayName")
         .populate("projectId", "name")
-        .sort(sort).skip(skip).limit(parseInt(limit)).lean(),
+        .sort(sort).skip(skip).limit(safeLimit).lean(),
       ContentItem.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: parseInt(limit) });
+    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
   } catch (err) { next(err); }
 };
 

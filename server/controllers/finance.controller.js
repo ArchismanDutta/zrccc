@@ -52,12 +52,13 @@ exports.listInvoices = async (req, res, next) => {
       filter.clientId = req.user.linkedClientId;
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const safeLimit = Math.min(parseInt(limit) || 20, 200);
+    const skip = (parseInt(page) - 1) * safeLimit;
     const [docs, total] = await Promise.all([
-      Invoice.find(filter).populate("clientId", "companyName displayName").sort(sort).skip(skip).limit(parseInt(limit)).lean(),
+      Invoice.find(filter).populate("clientId", "companyName displayName").sort(sort).skip(skip).limit(safeLimit).lean(),
       Invoice.countDocuments(filter),
     ]);
-    paginated(res, { docs, total, page: parseInt(page), limit: parseInt(limit) });
+    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
   } catch (err) { next(err); }
 };
 
@@ -177,12 +178,13 @@ exports.listPayments = async (req, res, next) => {
       filter.clientId = { $in: myClientIds };
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const safeLimit = Math.min(parseInt(limit) || 20, 200);
+    const skip = (parseInt(page) - 1) * safeLimit;
     const [docs, total] = await Promise.all([
-      Payment.find(filter).populate("loggedBy", "name").sort(sort).skip(skip).limit(parseInt(limit)).lean(),
+      Payment.find(filter).populate("loggedBy", "name").sort(sort).skip(skip).limit(safeLimit).lean(),
       Payment.countDocuments(filter),
     ]);
-    paginated(res, { docs, total, page: parseInt(page), limit: parseInt(limit) });
+    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
   } catch (err) { next(err); }
 };
 
