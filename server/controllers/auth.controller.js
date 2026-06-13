@@ -270,6 +270,36 @@ exports.resetPassword = async (req, res, next) => {
   }
 };
 
+// POST /api/auth/change-password
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) throw new ValidationError("currentPassword and newPassword are required");
+    if (!validatePassword(newPassword)) throw new ValidationError("Password must be at least 8 characters and contain a number or special character");
+
+    const user = await User.findById(req.user.id).select("+password");
+    if (!user) throw new NotFoundError("User");
+
+    const ok = await user.comparePassword(currentPassword);
+    if (!ok) throw new AuthenticationError("Current password is incorrect");
+
+    user.password = newPassword;
+    user.tokenVersion += 1;
+    user.refreshTokenHash = null;
+    await user.save();
+
+    bustTokenCache(String(user._id));
+
+    // Re-issue tokens so the current session stays alive
+    await issueTokens(res, user);
+
+    await logAudit({ action: "auth.change_password", entity: "User", entityId: user._id, userId: req.user.id, req });
+    success(res, { ok: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // POST /api/auth/revoke-all-sessions
 exports.revokeAllSessions = async (req, res, next) => {
   try {

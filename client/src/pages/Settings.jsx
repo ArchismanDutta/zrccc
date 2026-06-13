@@ -281,6 +281,99 @@ function TeamSection() {
   )
 }
 
+// ─── Profile ──────────────────────────────────────────────────
+function ProfileSection() {
+  const { user, refreshUser } = useAuth()
+  const { toast } = useToast()
+  const [form, setForm] = useState({ name: user?.name || '', phone: user?.phone || '' })
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
+  const [saving, setSaving] = useState(false)
+  const [savingPw, setSavingPw] = useState(false)
+
+  const handleProfile = async (e) => {
+    e.preventDefault()
+    if (!form.name.trim()) { toast.error('Name is required'); return }
+    setSaving(true)
+    try {
+      await api.updateUser(user._id, { name: form.name.trim(), phone: form.phone.trim() })
+      await refreshUser()
+      toast.success('Profile updated')
+    } catch (err) { toast.error(err.message || 'Failed to update profile') }
+    finally { setSaving(false) }
+  }
+
+  const handlePassword = async (e) => {
+    e.preventDefault()
+    if (!pwForm.current || !pwForm.next) { toast.error('All password fields are required'); return }
+    if (pwForm.next !== pwForm.confirm) { toast.error('New passwords do not match'); return }
+    if (pwForm.next.length < 8) { toast.error('Password must be at least 8 characters'); return }
+    setSavingPw(true)
+    try {
+      await api.changePassword({ currentPassword: pwForm.current, newPassword: pwForm.next })
+      setPwForm({ current: '', next: '', confirm: '' })
+      toast.success('Password changed successfully')
+    } catch (err) { toast.error(err.message || 'Failed to change password') }
+    finally { setSavingPw(false) }
+  }
+
+  return (
+    <div className="space-y-4">
+      <SectionCard title="Personal Information" subtitle="Update your name and contact details">
+        <form onSubmit={handleProfile} className="space-y-4 max-w-md">
+          <div className="flex items-center gap-4 mb-2">
+            <Avatar name={user?.name} size="lg" />
+            <div>
+              <p className="font-semibold text-fg">{user?.name}</p>
+              <p className="text-xs text-fg-3 capitalize">{ROLE_LABEL[user?.role] ?? user?.role}</p>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">Full Name</label>
+            <input className="input" value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">Email Address</label>
+            <input className="input opacity-60 cursor-not-allowed" value={user?.email || ''} disabled />
+            <p className="text-[11px] text-fg-3 mt-1">Email cannot be changed. Contact an admin if needed.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">Phone</label>
+            <input className="input" placeholder="+91 98765 43210"
+              value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+          </div>
+          <button type="submit" disabled={saving} className="btn btn-primary text-sm">
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </form>
+      </SectionCard>
+
+      <SectionCard title="Change Password" subtitle="Use a strong password with letters, numbers, and symbols">
+        <form onSubmit={handlePassword} className="space-y-3 max-w-md">
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">Current Password</label>
+            <input type="password" className="input" value={pwForm.current}
+              onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">New Password</label>
+            <input type="password" className="input" value={pwForm.next}
+              onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">Confirm New Password</label>
+            <input type="password" className="input" value={pwForm.confirm}
+              onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} />
+          </div>
+          <button type="submit" disabled={savingPw} className="btn btn-primary text-sm">
+            {savingPw ? 'Changing…' : 'Change Password'}
+          </button>
+        </form>
+      </SectionCard>
+    </div>
+  )
+}
+
 // ─── Security ─────────────────────────────────────────────────
 function SecuritySection() {
   const { toast } = useToast()
@@ -345,9 +438,10 @@ export default function SettingsPage() {
           {active === 'appearance' && (
             <AppearanceSection currentThemeId={themeId} onThemeChange={setThemeId} isDark={isDark} onDarkChange={setIsDark} />
           )}
+          {active === 'profile' && <ProfileSection />}
           {active === 'team' && <TeamSection />}
           {active === 'security' && <SecuritySection />}
-          {active !== 'appearance' && active !== 'team' && active !== 'security' && (
+          {active !== 'appearance' && active !== 'profile' && active !== 'team' && active !== 'security' && (
             <div className="card p-8 text-center">
               <p className="text-fg-3">This section is under construction — coming soon!</p>
             </div>

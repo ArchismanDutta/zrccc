@@ -50,6 +50,7 @@ class ApiClient {
   forgotPassword(email) { return this.post('/auth/forgot-password', { email }) }
   resetPassword(token, newPassword) { return this.post('/auth/reset-password', { token, newPassword }) }
   revokeAllSessions() { return this.post('/auth/revoke-all-sessions') }
+  changePassword(d) { return this.post('/auth/change-password', d) }
 
   // Clients
   getClients(q = '') { return this.get(`/clients${q}`) }
