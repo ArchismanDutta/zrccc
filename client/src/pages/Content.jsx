@@ -411,7 +411,7 @@ export default function ContentPage() {
     let day = null
     if (item.scheduledAt) {
       const d = new Date(item.scheduledAt)
-      if (d.getMonth() === month && d.getFullYear() === year) day = d.getDate()
+      if (d.getUTCMonth() === month && d.getUTCFullYear() === year) day = d.getUTCDate()
     }
     if (!day && item.weekNumber) {
       day = Math.min(((item.weekNumber - 1) * 7) + (item.dayOfWeek || 1) + 1, daysInMonth)
