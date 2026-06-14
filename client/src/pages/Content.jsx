@@ -370,8 +370,7 @@ export default function ContentPage() {
     const item = items.find(i => i._id === draggingId)
     if (!item) return
 
-    const newDate = new Date(year, month, dayNum)
-    const newISO  = newDate.toISOString()
+    const newISO  = new Date(Date.UTC(year, month, dayNum)).toISOString()
     const oldISO  = item.scheduledAt
 
     // Skip if dropped on same day
@@ -383,6 +382,7 @@ export default function ContentPage() {
     // Optimistic update
     setItems(prev => prev.map(i => i._id === draggingId ? { ...i, scheduledAt: newISO } : i))
     setDraggingId(null)
+    setDragOverDay(null)
 
     try {
       await api.updateContent(item._id, { scheduledAt: newISO })
