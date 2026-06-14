@@ -245,6 +245,10 @@ export default function ContentPage() {
   const [clientFilter, setClientFilter]   = useState('')
   const [projectFilter, setProjectFilter] = useState('')
 
+  // Drag to reschedule
+  const [draggingId, setDraggingId]   = useState(null)
+  const [dragOverDay, setDragOverDay] = useState(null)
+
   const plannedMonth = `${year}-${String(month + 1).padStart(2, '0')}`
 
   const fetchContent = async () => {
@@ -359,6 +363,34 @@ export default function ContentPage() {
       toast.success('Sent for revision')
       setModalOpen(false); fetchContent()
     } catch (err) { toast.error(err.message) }
+  }
+
+  const handleDrop = async (dayNum) => {
+    if (!draggingId) return
+    const item = items.find(i => i._id === draggingId)
+    if (!item) return
+
+    const newDate = new Date(year, month, dayNum)
+    const newISO  = newDate.toISOString()
+    const oldISO  = item.scheduledAt
+
+    // Skip if dropped on same day
+    if (oldISO) {
+      const oldDay = new Date(oldISO).getDate()
+      if (oldDay === dayNum) { setDraggingId(null); return }
+    }
+
+    // Optimistic update
+    setItems(prev => prev.map(i => i._id === draggingId ? { ...i, scheduledAt: newISO } : i))
+    setDraggingId(null)
+
+    try {
+      await api.updateContent(item._id, { scheduledAt: newISO })
+    } catch {
+      // Revert on failure
+      setItems(prev => prev.map(i => i._id === item._id ? { ...i, scheduledAt: oldISO } : i))
+      toast.error('Failed to reschedule — changes reverted')
+    }
   }
 
   const daysInMonth  = getDaysInMonth(year, month)
