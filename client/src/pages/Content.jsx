@@ -519,8 +519,11 @@ export default function ContentPage() {
 
               return (
                 <div key={day}
-                  onClick={() => openCreate(dateStr)}
-                  className={`group relative min-h-[52px] sm:min-h-[88px] lg:min-h-[108px] border-r border-b border-[var(--color-border)] p-0.5 sm:p-1.5 cursor-pointer transition-colors hover:bg-accent/5 ${isWeekend ? 'bg-[var(--color-surface-2)] hover:bg-accent/5' : ''}`}>
+                  onClick={() => { if (!draggingId) openCreate(dateStr) }}
+                  onDragOver={e => { e.preventDefault(); setDragOverDay(day) }}
+                  onDragLeave={() => setDragOverDay(null)}
+                  onDrop={e => { e.preventDefault(); handleDrop(day) }}
+                  className={`group relative min-h-[52px] sm:min-h-[88px] lg:min-h-[108px] border-r border-b border-[var(--color-border)] p-0.5 sm:p-1.5 cursor-pointer transition-colors hover:bg-accent/5 ${isWeekend ? 'bg-[var(--color-surface-2)] hover:bg-accent/5' : ''} ${draggingId && dragOverDay === day ? 'ring-2 ring-inset ring-accent/50 bg-accent/5' : ''}`}>
                   {/* Day number + add hint */}
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="text-[9px] text-accent opacity-0 group-hover:opacity-100 transition-opacity font-bold pl-0.5 sm:pl-1 leading-none hidden sm:block">+</span>
@@ -533,8 +536,11 @@ export default function ContentPage() {
                       const colour = STATUS_COLOUR[item.status] ?? 'var(--color-fg-3)'
                       return (
                         <button key={item._id}
+                          draggable
+                          onDragStart={e => { e.stopPropagation(); setDraggingId(item._id) }}
+                          onDragEnd={e => { e.stopPropagation(); setDraggingId(null); setDragOverDay(null) }}
                           onClick={e => { e.stopPropagation(); openEdit(item) }}
-                          className="w-full flex items-center gap-0.5 px-1 sm:px-1.5 py-px sm:py-0.5 rounded-md text-[8px] sm:text-[10px] font-medium truncate text-left hover:opacity-80 transition-opacity"
+                          className={`w-full flex items-center gap-0.5 px-1 sm:px-1.5 py-px sm:py-0.5 rounded-md text-[8px] sm:text-[10px] font-medium truncate text-left hover:opacity-80 transition-opacity ${draggingId === item._id ? 'opacity-40' : ''}`}
                           style={{ background: `${colour}18`, color: colour, border: `1px solid ${colour}30` }}>
                           <span className="truncate">{item.title}</span>
                         </button>
