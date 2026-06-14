@@ -262,7 +262,7 @@ export default function ContentPage() {
   useEffect(() => { fetchContent() }, [year, month, clientFilter, projectFilter])
 
   const loadFormDeps = async () => {
-    if (projects.length && clients.length) return
+    if (projects.length && clients.length && users.length) return
     const [pRes, cRes, uRes] = await Promise.allSettled([
       api.getProjects('?limit=100'),
       api.getClients('?limit=100'),
