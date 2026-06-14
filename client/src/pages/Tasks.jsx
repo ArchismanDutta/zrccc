@@ -171,10 +171,9 @@ export default function TasksPage() {
   }
 
   const loadFormDeps = async () => {
-    try {
-      const [p, u] = await Promise.all([api.getProjects('?limit=100'), api.getUsers('?limit=100')])
-      setProjects(p.data); setUsers(u.data)
-    } catch {}
+    const [pRes, uRes] = await Promise.allSettled([api.getProjects('?limit=100'), api.getUsers('?limit=100')])
+    if (pRes.status === 'fulfilled') setProjects(pRes.value.data || [])
+    if (uRes.status === 'fulfilled') setUsers(uRes.value.data || [])
   }
 
   useEffect(() => { fetchTasks() }, [])
