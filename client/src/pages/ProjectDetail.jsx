@@ -412,7 +412,11 @@ export default function ProjectDetailPage() {
             ) : <p className="text-sm text-fg-3">No PM assigned</p>}
           </SectionCard>
 
-          <SectionCard title="Progress">
+          <SectionCard title="Progress" actions={
+            <button className="btn btn-primary btn-sm gap-1.5" onClick={openTaskModal}>
+              <Plus size={13} /> Add Task
+            </button>
+          }>
             <ProgressBar value={project.overallProgress ?? 0} />
             <div className="grid grid-cols-3 gap-2 mt-4">
               {[

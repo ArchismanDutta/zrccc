@@ -10,6 +10,16 @@ import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import api from '@/lib/api'
 
+const CATEGORY_OPTIONS = [
+  ['shooting','Shoot'], ['reel_editing','Reel Editing'], ['video_editing','Video Editing'],
+  ['graphic_design','Graphic Design'], ['carousel_design','Carousel Design'],
+  ['caption_writing','Caption Writing'], ['ad_copy','Ad Copy'],
+  ['meta_ads_management','Meta Ads Mgmt'], ['meta_ad_creative','Ad Creative'],
+  ['web_development','Web Dev'], ['web_maintenance','Web Maint.'],
+  ['content_planning','Content Planning'], ['scheduling','Scheduling'],
+  ['client_report','Client Report'], ['internal','Internal'], ['review','Review'],
+]
+
 const TYPE_LABEL = {
   social_media_management: 'Social Media', meta_ads: 'Meta Ads', reels: 'Reels', graphics: 'Graphics',
   carousels: 'Carousels', video_production: 'Video', website_development: 'Website Dev',
@@ -30,6 +40,28 @@ export default function ProjectsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ name: '', clientId: '', projectManagerId: '', teamMemberIds: [], type: [], priority: 'medium', startDate: '', endDate: '', budget: '' })
   const [saving, setSaving] = useState(false)
+
+  // Quick task modal (from project card)
+  const [quickTask, setQuickTask]       = useState(null) // { projectId, projectName }
+  const [quickForm, setQuickForm]       = useState({ title: '', category: '', priority: 'medium' })
+  const [quickSaving, setQuickSaving]   = useState(false)
+
+  const openQuickTask = (e, p) => {
+    e.stopPropagation()
+    setQuickForm({ title: '', category: '', priority: 'medium' })
+    setQuickTask({ projectId: p._id, projectName: p.name })
+  }
+
+  const handleQuickTask = async () => {
+    if (!quickForm.title || !quickForm.category) { toast.error('Title and category are required'); return }
+    setQuickSaving(true)
+    try {
+      await api.createTask({ ...quickForm, projectId: quickTask.projectId })
+      toast.success('Task created')
+      setQuickTask(null)
+    } catch (err) { toast.error(err.message) }
+    finally { setQuickSaving(false) }
+  }
 
   const fetchProjects = async () => {
     try { const res = await api.getProjects('?limit=100'); setProjects(res.data) }
@@ -119,14 +151,21 @@ export default function ProjectsPage() {
               </div>
               <div className="flex items-center justify-between">
                 <AvatarGroup users={(p.teamMembers || []).map(m => ({ name: m.userId?.name || 'User' }))} max={3} size="xs" />
-                <div className="flex items-center gap-1 text-[10px] text-fg-3"><Clock size={10} />{formatDate(p.endDate, { year: undefined })}</div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-[10px] text-fg-3"><Clock size={10} />{formatDate(p.endDate, { year: undefined })}</div>
+                  <button onClick={e => openQuickTask(e, p)}
+                    className="btn btn-ghost btn-sm gap-1 text-[10px] text-accent hover:bg-accent/10 py-0.5 px-1.5 h-auto"
+                    title="Add task to this project">
+                    <Plus size={11} /> Task
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       ) : (
         <div className="table-container">
-          <table><thead><tr><th>Project</th><th>Client</th><th>Services</th><th>Progress</th><th>Team</th><th>Status</th><th>Due</th></tr></thead>
+          <table><thead><tr><th>Project</th><th>Client</th><th>Services</th><th>Progress</th><th>Team</th><th>Status</th><th>Due</th><th></th></tr></thead>
           <tbody>{filtered.map(p => (
             <tr key={p._id} className="cursor-pointer" onClick={() => navigate(`/projects/${p._id}`)}>
               <td><p className="font-medium text-fg">{p.name}</p><p className="text-xs text-fg-3">PM: {p.projectManagerId?.name || '—'}</p></td>
@@ -136,6 +175,12 @@ export default function ProjectsPage() {
               <td><AvatarGroup users={(p.teamMembers || []).map(m => ({ name: m.userId?.name || 'User' }))} max={3} size="xs" /></td>
               <td><StatusBadge status={p.status} /></td>
               <td className="text-xs text-fg-2 whitespace-nowrap">{formatDate(p.endDate, { year: undefined })}</td>
+              <td>
+                <button onClick={e => openQuickTask(e, p)}
+                  className="btn btn-ghost btn-sm gap-1 text-[10px] text-accent hover:bg-accent/10">
+                  <Plus size={11} /> Task
+                </button>
+              </td>
             </tr>
           ))}</tbody></table>
         </div>
@@ -214,6 +259,45 @@ export default function ProjectsPage() {
               </label>
             ))}
           </div></div>
+        </div>
+      </Modal>
+
+      {/* Quick Add Task modal */}
+      <Modal isOpen={!!quickTask} onClose={() => setQuickTask(null)}
+        title={`Add Task — ${quickTask?.projectName || ''}`} size="sm"
+        footer={
+          <><button className="btn btn-secondary" onClick={() => setQuickTask(null)}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleQuickTask} disabled={quickSaving}>{quickSaving ? 'Creating…' : 'Create Task'}</button></>
+        }>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">Title *</label>
+            <input className="input" placeholder="What needs to be done?" autoFocus
+              value={quickForm.title} onChange={e => setQuickForm(f => ({ ...f, title: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-fg-2 mb-1">Category *</label>
+              <select className="input" value={quickForm.category} onChange={e => setQuickForm(f => ({ ...f, category: e.target.value }))}>
+                <option value="">Select…</option>
+                {CATEGORY_OPTIONS.map(([val, label]) => <option key={val} value={val}>{label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-fg-2 mb-1">Priority</label>
+              <select className="input" value={quickForm.priority} onChange={e => setQuickForm(f => ({ ...f, priority: e.target.value }))}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">Due Date</label>
+            <input type="date" className="input" value={quickForm.dueDate || ''}
+              onChange={e => setQuickForm(f => ({ ...f, dueDate: e.target.value }))} />
+          </div>
         </div>
       </Modal>
     </div>
