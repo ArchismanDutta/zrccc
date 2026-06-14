@@ -104,6 +104,16 @@ exports.updateTask = async (req, res, next) => {
     const task = await Task.findById(req.params.id);
     if (!task) throw new NotFoundError("Task");
 
+    const role = req.user.role;
+    if (role === "project_manager") {
+      const Project = require("../models/Project");
+      const onProject = await Project.exists({ _id: task.projectId, "teamMembers.userId": req.user.id });
+      if (!onProject) throw new NotFoundError("Task");
+    } else if (!["super_admin", "admin"].includes(role)) {
+      const isAssigned = (task.assignedTo || []).some(u => String(u._id || u) === String(req.user.id));
+      if (!isAssigned) throw new NotFoundError("Task");
+    }
+
     const allowed = ["title", "description", "category", "priority", "dueDate", "estimatedHours", "actualHours", "tags", "assignedTo"];
     for (const key of allowed) {
       if (req.body[key] !== undefined) task[key] = req.body[key];
