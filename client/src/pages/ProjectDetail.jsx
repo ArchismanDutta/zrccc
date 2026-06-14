@@ -140,6 +140,33 @@ export default function ProjectDetailPage() {
   const [teamForm, setTeamForm]             = useState({ userId: '', projectRole: '' })
   const [teamSaving, setTeamSaving]         = useState(false)
 
+  // Create task modal
+  const [taskModalOpen, setTaskModalOpen] = useState(false)
+  const [taskForm, setTaskForm] = useState({ title: '', category: '', priority: 'medium', dueDate: '', description: '', assignedTo: [] })
+  const [taskSaving, setTaskSaving] = useState(false)
+
+  const openTaskModal = () => {
+    setTaskForm({ title: '', category: '', priority: 'medium', dueDate: '', description: '', assignedTo: [] })
+    setTaskModalOpen(true)
+  }
+
+  const handleCreateTask = async () => {
+    if (!taskForm.title || !taskForm.category) { toast.error('Title and category are required'); return }
+    setTaskSaving(true)
+    try {
+      await api.createTask({ ...taskForm, projectId: id })
+      toast.success('Task created')
+      setTaskModalOpen(false)
+      fetchTasks()
+    } catch (err) { toast.error(err.message) }
+    finally { setTaskSaving(false) }
+  }
+
+  const toggleTaskAssignee = uid => setTaskForm(f => ({
+    ...f,
+    assignedTo: f.assignedTo.includes(uid) ? f.assignedTo.filter(x => x !== uid) : [...f.assignedTo, uid],
+  }))
+
   // Add milestone inline form
   const [showMilestoneForm, setShowMilestoneForm] = useState(false)
   const [milestoneForm, setMilestoneForm]         = useState({ title: '', dueDate: '' })
@@ -450,31 +477,39 @@ export default function ProjectDetailPage() {
 
       {/* Tasks Kanban */}
       {tab === 'Tasks' && (
-        tasks.length === 0 ? (
-          <EmptyState icon={CheckCircle2} title="No tasks yet" description="Tasks assigned to this project will appear here" />
-        ) : (
-          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-            <div className="flex gap-3 min-w-max sm:min-w-0 sm:grid sm:grid-cols-3 lg:grid-cols-5">
-              {TASK_COLUMNS.map(col => {
-                const colTasks = tasks.filter(t => t.status === col.id)
-                return (
-                  <div key={col.id} className="w-64 sm:w-auto">
-                    <div className="flex items-center gap-2 mb-2 px-1">
-                      <col.icon size={13} style={{ color: col.colour }} />
-                      <span className="text-xs font-semibold text-fg-2">{col.label}</span>
-                      <span className="ml-auto text-xs text-fg-3">{colTasks.length}</span>
-                    </div>
-                    <div className="space-y-2 min-h-[80px]">
-                      {colTasks.map(task => (
-                        <TaskCard key={task._id} task={task} onMove={moveTask} />
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-fg-3">{tasks.length} task{tasks.length !== 1 ? 's' : ''} · {tasks.filter(t => t.status === 'done').length} done</p>
+            <button className="btn btn-primary btn-sm gap-1.5" onClick={openTaskModal}>
+              <Plus size={14} /> Add Task
+            </button>
           </div>
-        )
+          {tasks.length === 0 ? (
+            <EmptyState icon={CheckCircle2} title="No tasks yet" description="Click Add Task to create the first task for this project" />
+          ) : (
+            <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+              <div className="flex gap-3 min-w-max sm:min-w-0 sm:grid sm:grid-cols-3 lg:grid-cols-5">
+                {TASK_COLUMNS.map(col => {
+                  const colTasks = tasks.filter(t => t.status === col.id)
+                  return (
+                    <div key={col.id} className="w-64 sm:w-auto">
+                      <div className="flex items-center gap-2 mb-2 px-1">
+                        <col.icon size={13} style={{ color: col.colour }} />
+                        <span className="text-xs font-semibold text-fg-2">{col.label}</span>
+                        <span className="ml-auto text-xs text-fg-3">{colTasks.length}</span>
+                      </div>
+                      <div className="space-y-2 min-h-[80px]">
+                        {colTasks.map(task => (
+                          <TaskCard key={task._id} task={task} onMove={moveTask} />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Content */}
@@ -629,6 +664,81 @@ export default function ProjectDetailPage() {
                   </button>
                 )
               })}
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Create Task modal */}
+      <Modal isOpen={taskModalOpen} onClose={() => setTaskModalOpen(false)} title="Add Task" size="md"
+        footer={
+          <><button className="btn btn-secondary" onClick={() => setTaskModalOpen(false)}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleCreateTask} disabled={taskSaving}>{taskSaving ? 'Creating…' : 'Create Task'}</button></>
+        }>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">Title *</label>
+            <input className="input" placeholder="What needs to be done?" value={taskForm.title}
+              onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-fg-2 mb-1">Category *</label>
+              <select className="input" value={taskForm.category} onChange={e => setTaskForm(f => ({ ...f, category: e.target.value }))}>
+                <option value="">Select category</option>
+                {Object.entries(CATEGORY_META).map(([key, meta]) => (
+                  <option key={key} value={key}>{meta.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-fg-2 mb-1">Priority</label>
+              <select className="input" value={taskForm.priority} onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value }))}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-fg-2 mb-1">Due Date</label>
+              <input type="date" className="input" value={taskForm.dueDate}
+                onChange={e => setTaskForm(f => ({ ...f, dueDate: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-fg-2 mb-1">Est. Hours</label>
+              <input type="number" min={0} className="input" placeholder="0" value={taskForm.estimatedHours || ''}
+                onChange={e => setTaskForm(f => ({ ...f, estimatedHours: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">Description</label>
+            <textarea className="input" rows={2} placeholder="Optional details…" value={taskForm.description}
+              onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-2">
+              Assign To
+              {taskForm.assignedTo.length > 0 && <span className="ml-1 text-accent font-normal">{taskForm.assignedTo.length} selected</span>}
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {(project.teamMembers || []).map(m => {
+                const u = m.userId
+                if (!u?._id) return null
+                const selected = taskForm.assignedTo.includes(u._id)
+                return (
+                  <button key={u._id} type="button" onClick={() => toggleTaskAssignee(u._id)}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] border transition-colors ${selected ? 'bg-accent/10 border-accent text-accent' : 'border-[var(--color-border)] text-fg-3 hover:border-[var(--color-fg-3)]'}`}>
+                    <span className="w-4 h-4 rounded-full bg-current/20 flex items-center justify-center text-[9px] font-bold">{u.name?.charAt(0)}</span>
+                    {u.name}
+                  </button>
+                )
+              })}
+              {(project.teamMembers || []).length === 0 && (
+                <p className="text-xs text-fg-3">Add team members to the project to assign tasks</p>
+              )}
             </div>
           </div>
         </div>
