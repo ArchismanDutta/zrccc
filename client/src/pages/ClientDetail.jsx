@@ -13,12 +13,6 @@ import { useToast } from '@/components/ui/Toast'
 import Modal from '@/components/ui/Modal'
 import api from '@/lib/api'
 
-const SERVICE_LABELS = {
-  social_media_management: 'Social Media', meta_ads: 'Meta Ads', reels: 'Reels',
-  graphics: 'Graphics', carousels: 'Carousels', video_production: 'Video Production',
-  website_development: 'Website Dev', website_maintenance: 'Website Maint.',
-  content_writing: 'Content Writing', photography: 'Photography',
-}
 
 const TABS = ['Overview', 'Projects', 'Finance']
 
@@ -219,18 +213,8 @@ export default function ClientDetailPage() {
       {/* Overview tab */}
       {tab === 'Overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Contract & Services */}
-          <SectionCard title="Services & Contract">
-            <div className="mb-3">
-              <p className="text-xs text-fg-3 mb-2">Services</p>
-              <div className="flex flex-wrap gap-1.5">
-                {(client.services || []).length === 0
-                  ? <span className="text-xs text-fg-3">No services added</span>
-                  : (client.services || []).map(s => (
-                    <Badge key={s} variant="accent">{SERVICE_LABELS[s] ?? s}</Badge>
-                  ))}
-              </div>
-            </div>
+          {/* Contract */}
+          <SectionCard title="Contract">
             <div>
               <InfoRow label="Monthly Value" value={formatCurrency(client.contract?.monthlyValue || 0)} />
               <InfoRow label="Billing Cycle" value={client.contract?.billingCycle} />

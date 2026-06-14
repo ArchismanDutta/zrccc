@@ -2,20 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Mail, Phone, Globe } from 'lucide-react'
 import { PageHeader, EmptyState } from '@/components/ui/Cards'
-import { StatusBadge, Badge, PriorityBadge } from '@/components/ui/Badge'
+import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
 import { formatCurrency } from '@/lib/utils'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import api from '@/lib/api'
 
-const SERVICE_LABELS = {
-  social_media_management: 'Social Media', meta_ads: 'Meta Ads', reels: 'Reels', graphics: 'Graphics',
-  carousels: 'Carousels', video_production: 'Video', website_development: 'Website Dev',
-  website_maintenance: 'Website Maint.', content_writing: 'Content Writing', photography: 'Photography',
-}
-const ALL_SERVICES = Object.keys(SERVICE_LABELS)
-const EMPTY_FORM = { companyName: '', contactName: '', contactEmail: '', contactPhone: '', website: '', industry: '', services: [], 'contract.monthlyValue': '', priority: 'medium' }
+const EMPTY_FORM = { companyName: '', contactName: '', contactEmail: '', contactPhone: '', website: '', industry: '', 'contract.monthlyValue': '', priority: 'medium' }
 
 export default function ClientsPage() {
   const { toast } = useToast()
@@ -42,15 +36,13 @@ export default function ClientsPage() {
   })
   const totalMRR = filtered.reduce((s, c) => s + (c.contract?.monthlyValue || 0), 0)
 
-  const toggleService = (svc) => setForm(f => ({ ...f, services: f.services.includes(svc) ? f.services.filter(s => s !== svc) : [...f.services, svc] }))
-  const toggleAllServices = () => setForm(f => ({ ...f, services: f.services.length === ALL_SERVICES.length ? [] : [...ALL_SERVICES] }))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.companyName) { toast.error('Company name is required'); return }
     setSaving(true)
     try {
-      await api.createClient({ companyName: form.companyName, contactName: form.contactName, contactEmail: form.contactEmail, contactPhone: form.contactPhone, website: form.website, industry: form.industry, services: form.services, contract: { monthlyValue: Number(form['contract.monthlyValue']) || 0 }, priority: form.priority })
+      await api.createClient({ companyName: form.companyName, contactName: form.contactName, contactEmail: form.contactEmail, contactPhone: form.contactPhone, website: form.website, industry: form.industry, contract: { monthlyValue: Number(form['contract.monthlyValue']) || 0 }, priority: form.priority })
       toast.success('Client created!'); setModalOpen(false); setForm({ ...EMPTY_FORM }); fetchClients()
     } catch (err) { toast.error(err.message) }
     finally { setSaving(false) }
@@ -95,10 +87,6 @@ export default function ClientsPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1 mb-3">
-                {(client.services || []).slice(0, 4).map(s => <Badge key={s} variant="neutral" className="text-[10px]">{SERVICE_LABELS[s] ?? s}</Badge>)}
-                {(client.services || []).length > 4 && <Badge variant="neutral" className="text-[10px]">+{client.services.length - 4}</Badge>}
-              </div>
               <div className="grid grid-cols-3 gap-1 sm:gap-2 py-2.5 sm:py-3 border-t border-b border-[var(--color-border)] mb-3">
                 <div className="text-center"><p className="text-xs font-bold text-fg">{formatCurrency(client.contract?.monthlyValue || 0)}</p><p className="text-[10px] text-fg-3">MRR</p></div>
                 <div className="text-center border-x border-[var(--color-border)]"><p className="text-xs font-bold text-fg">{client.healthScore ?? '—'}</p><p className="text-[10px] text-fg-3">Health</p></div>
@@ -134,22 +122,6 @@ export default function ClientsPage() {
             <div><label className="block text-xs font-medium text-fg-2 mb-1">Priority</label><select className="input" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
               <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="vip">VIP</option>
             </select></div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-medium text-fg-2">Services</label>
-              <label className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] cursor-pointer border transition-colors ${form.services.length === ALL_SERVICES.length ? 'bg-accent/10 border-accent text-accent' : 'border-[var(--color-border)] text-fg-3 hover:border-[var(--color-fg-3)]'}`}>
-                <input type="checkbox" checked={form.services.length === ALL_SERVICES.length} onChange={toggleAllServices} className="sr-only" />
-                All Services
-              </label>
-            </div>
-            <div className="flex flex-wrap gap-1.5 sm:gap-2">
-              {ALL_SERVICES.map(svc => (
-                <label key={svc} className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs cursor-pointer border transition-colors ${form.services.includes(svc) ? 'bg-accent/10 border-accent text-accent' : 'border-[var(--color-border)] text-fg-3 hover:border-[var(--color-fg-3)]'}`}>
-                  <input type="checkbox" checked={form.services.includes(svc)} onChange={() => toggleService(svc)} className="sr-only" />{SERVICE_LABELS[svc]}
-                </label>
-              ))}
-            </div>
           </div>
         </div>
       </Modal>
