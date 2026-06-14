@@ -241,23 +241,36 @@ export default function ContentPage() {
   // Day overflow popover
   const [overflowDay, setOverflowDay] = useState(null)
 
+  // Filters
+  const [clientFilter, setClientFilter]   = useState('')
+  const [projectFilter, setProjectFilter] = useState('')
+
   const plannedMonth = `${year}-${String(month + 1).padStart(2, '0')}`
 
   const fetchContent = async () => {
     setLoading(true)
-    try { const res = await api.getContent(`?plannedMonth=${plannedMonth}&limit=200`); setItems(res.data) }
-    catch { toast.error('Failed to load content') }
+    try {
+      const params = new URLSearchParams({ plannedMonth, limit: 200 })
+      if (clientFilter)  params.set('clientId', clientFilter)
+      if (projectFilter) params.set('projectId', projectFilter)
+      const res = await api.getContent(`?${params}`)
+      setItems(res.data)
+    } catch { toast.error('Failed to load content') }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchContent() }, [year, month])
+  useEffect(() => { fetchContent() }, [year, month, clientFilter, projectFilter])
 
   const loadFormDeps = async () => {
-    if (projects.length && clients.length && users.length) return
-    try {
-      const [p, c, u] = await Promise.all([api.getProjects('?limit=100'), api.getClients('?limit=100'), api.getUsers('?limit=100')])
-      setProjects(p.data); setClients(c.data); setUsers(u.data)
-    } catch {}
+    if (projects.length && clients.length) return
+    const [pRes, cRes, uRes] = await Promise.allSettled([
+      api.getProjects('?limit=100'),
+      api.getClients('?limit=100'),
+      api.getUsers('?limit=100'),
+    ])
+    if (pRes.status === 'fulfilled') setProjects(pRes.value.data || [])
+    if (cRes.status === 'fulfilled') setClients(cRes.value.data || [])
+    if (uRes.status === 'fulfilled') setUsers(uRes.value.data || [])
   }
 
   const openCreate = async (date = null) => {
