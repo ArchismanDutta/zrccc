@@ -157,7 +157,7 @@ function NewDmModal({ onClose, onCreated }) {
   useEffect(() => {
     api.getUsers('?limit=100')
       .then(r => setUsers(r.data || []))
-      .catch(() => {})
+      .catch(() => setUsers([]))
       .finally(() => setLoading(false))
   }, [])
 
@@ -178,6 +178,7 @@ function NewDmModal({ onClose, onCreated }) {
         <input className="input text-sm" placeholder="Search team members…" value={search} onChange={e => setSearch(e.target.value)} autoFocus />
         <div className="max-h-60 overflow-y-auto space-y-1">
           {loading && <p className="text-sm text-fg-3 text-center py-4">Loading…</p>}
+          {!loading && users.length === 0 && <p className="text-sm text-fg-3 text-center py-4">No team members available</p>}
           {!loading && filtered.map(u => (
             <button key={u._id} onClick={() => handleSelect(u._id)}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--color-surface-3)] text-left">
