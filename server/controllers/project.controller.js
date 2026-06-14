@@ -129,7 +129,7 @@ exports.updateProject = async (req, res, next) => {
       // Add new PM to teamMembers if not already present
       const alreadyMember = project.teamMembers.some(m => String(m.userId) === newPmId);
       if (!alreadyMember) {
-        project.teamMembers.push({ userId: newPmId, projectRole: "Project Manager", addedBy: req.user.id });
+        project.teamMembers.push({ userId: req.body.projectManagerId, projectRole: "Project Manager", addedBy: req.user.id });
       }
     }
 
