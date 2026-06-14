@@ -55,9 +55,13 @@ exports.listClients = async (req, res, next) => {
 
     if (status) filter.status = status;
 
-    // Scope by role: account_manager sees only their own
+    // Scope by role
     if (req.user.role === "account_manager") {
       filter.accountManagerId = req.user.id;
+    } else if (req.user.role === "project_manager") {
+      const Project = require("../models/Project");
+      const projects = await Project.find({ "teamMembers.userId": req.user.id }, "clientId").lean();
+      filter._id = { $in: projects.map(p => p.clientId).filter(Boolean) };
     }
 
     if (search) {
@@ -94,12 +98,13 @@ exports.getClient = async (req, res, next) => {
       .lean();
     if (!client || client.isArchived) throw new NotFoundError("Client");
 
-    // For account_manager role — only their own clients
-    if (req.user.role === "account_manager" && !req.user.permissions.includes("clients:read:all")) {
+    if (req.user.role === "account_manager") {
       const amId = client.accountManagerId?._id ?? client.accountManagerId;
-      if (String(amId) !== String(req.user.id)) {
-        throw new ForbiddenError("You can only access your own clients");
-      }
+      if (String(amId) !== String(req.user.id)) throw new NotFoundError("Client");
+    } else if (req.user.role === "project_manager") {
+      const Project = require("../models/Project");
+      const linked = await Project.exists({ clientId: client._id, "teamMembers.userId": req.user.id });
+      if (!linked) throw new NotFoundError("Client");
     }
 
     success(res, client);
@@ -114,12 +119,7 @@ exports.updateClient = async (req, res, next) => {
     const client = await Client.findById(req.params.id);
     if (!client || client.isArchived) throw new NotFoundError("Client");
 
-    // For account_manager role — only their own clients
-    if (req.user.role === "account_manager" && !req.user.permissions.includes("clients:read:all")) {
-      if (String(client.accountManagerId) !== String(req.user.id)) {
-        throw new ForbiddenError("You can only access your own clients");
-      }
-    }
+    // account_manager no longer has clients:update — middleware blocks them before this point
 
     const allowed = [
       "companyName", "displayName", "contactName", "contactEmail", "contactPhone",
