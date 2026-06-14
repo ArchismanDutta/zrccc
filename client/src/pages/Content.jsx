@@ -375,8 +375,8 @@ export default function ContentPage() {
 
     // Skip if dropped on same day
     if (oldISO) {
-      const oldDay = new Date(oldISO).getDate()
-      if (oldDay === dayNum) { setDraggingId(null); return }
+      const oldDay = new Date(oldISO).getUTCDate()
+      if (oldDay === dayNum) { setDraggingId(null); setDragOverDay(null); return }
     }
 
     // Optimistic update
