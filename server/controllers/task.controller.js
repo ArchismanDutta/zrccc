@@ -41,9 +41,15 @@ exports.listTasks = async (req, res, next) => {
     if (projectId) filter.projectId = projectId;
     if (assignee) filter.assignedTo = assignee;
 
-    // Employee-level roles see only their own tasks
-    const empRoles = ["employee", "social_media_manager", "graphic_designer", "video_editor", "cinematographer", "content_writer", "web_developer"];
-    if (empRoles.includes(req.user.role)) {
+    // Role-based task scoping
+    const role = req.user.role;
+    if (role === "project_manager") {
+      // PMs see all tasks on projects they're assigned to
+      const Project = require("../models/Project");
+      const myProjects = await Project.find({ "teamMembers.userId": req.user.id }, "_id").lean();
+      filter.projectId = { $in: myProjects.map(p => p._id) };
+    } else if (!["super_admin", "admin"].includes(role)) {
+      // Everyone else sees only tasks assigned to them
       filter.assignedTo = req.user.id;
     }
 

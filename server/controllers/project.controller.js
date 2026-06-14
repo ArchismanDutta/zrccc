@@ -6,8 +6,9 @@ const { ValidationError, NotFoundError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
 
 const TEAM_SCOPED_ROLES = [
-  "dept_head", "employee", "social_media_manager", "graphic_designer",
-  "video_editor", "cinematographer", "content_writer", "web_developer",
+  "project_manager", "account_manager", "dept_head", "employee",
+  "social_media_manager", "graphic_designer", "video_editor",
+  "cinematographer", "content_writer", "web_developer",
 ];
 
 exports.createProject = async (req, res, next) => {

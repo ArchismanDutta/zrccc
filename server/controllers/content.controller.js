@@ -54,9 +54,16 @@ exports.listContent = async (req, res, next) => {
     if (plannedMonth) filter.plannedMonth = plannedMonth;
     if (assignee) filter.assignedTo = assignee;
 
-    // Client role scoping
-    if (req.user.role === "client") {
+    // Role-based scoping
+    const role = req.user.role;
+    if (role === "client") {
       filter.clientId = req.user.linkedClientId;
+    } else if (role === "project_manager") {
+      const Project = require("../models/Project");
+      const myProjects = await Project.find({ "teamMembers.userId": req.user.id }, "_id").lean();
+      filter.projectId = { $in: myProjects.map(p => p._id) };
+    } else if (!["super_admin", "admin", "account_manager"].includes(role)) {
+      filter.assignedTo = req.user.id;
     }
 
     const safeLimit = Math.min(parseInt(limit) || 20, 200);
