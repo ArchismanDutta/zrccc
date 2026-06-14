@@ -5,6 +5,19 @@ const { success, created, paginated } = require("../utils/response");
 const { ValidationError, NotFoundError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
 
+const _checkTaskAccess = async (task, user) => {
+  const role = user.role;
+  if (["super_admin", "admin"].includes(role)) return;
+  if (role === "project_manager") {
+    const Project = require("../models/Project");
+    const onProject = await Project.exists({ _id: task.projectId, "teamMembers.userId": user.id });
+    if (!onProject) throw new NotFoundError("Task");
+    return;
+  }
+  const isAssigned = (task.assignedTo || []).some(u => String(u._id || u) === String(user.id));
+  if (!isAssigned) throw new NotFoundError("Task");
+};
+
 exports.createTask = async (req, res, next) => {
   try {
     const { title, category, assignedTo } = req.body;
@@ -84,17 +97,7 @@ exports.getTask = async (req, res, next) => {
       .populate("reviewedBy", "name")
       .lean();
     if (!task) throw new NotFoundError("Task");
-
-    const role = req.user.role;
-    if (role === "project_manager") {
-      const Project = require("../models/Project");
-      const onProject = await Project.exists({ _id: task.projectId?._id || task.projectId, "teamMembers.userId": req.user.id });
-      if (!onProject) throw new NotFoundError("Task");
-    } else if (!["super_admin", "admin"].includes(role)) {
-      const isAssigned = (task.assignedTo || []).some(u => String(u._id || u) === String(req.user.id));
-      if (!isAssigned) throw new NotFoundError("Task");
-    }
-
+    await _checkTaskAccess(task, req.user);
     success(res, task);
   } catch (err) { next(err); }
 };
@@ -103,16 +106,7 @@ exports.updateTask = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) throw new NotFoundError("Task");
-
-    const role = req.user.role;
-    if (role === "project_manager") {
-      const Project = require("../models/Project");
-      const onProject = await Project.exists({ _id: task.projectId, "teamMembers.userId": req.user.id });
-      if (!onProject) throw new NotFoundError("Task");
-    } else if (!["super_admin", "admin"].includes(role)) {
-      const isAssigned = (task.assignedTo || []).some(u => String(u._id || u) === String(req.user.id));
-      if (!isAssigned) throw new NotFoundError("Task");
-    }
+    await _checkTaskAccess(task, req.user);
 
     const allowed = ["title", "description", "category", "priority", "dueDate", "estimatedHours", "actualHours", "tags", "assignedTo"];
     for (const key of allowed) {
@@ -129,6 +123,7 @@ exports.changeStatus = async (req, res, next) => {
     if (!status) throw new ValidationError("status is required");
     const task = await Task.findById(req.params.id);
     if (!task) throw new NotFoundError("Task");
+    await _checkTaskAccess(task, req.user);
 
     // Auto-set timestamps
     if (status === "in_progress" && !task.startedAt) task.startedAt = new Date();
@@ -148,6 +143,7 @@ exports.addProgressUpdate = async (req, res, next) => {
     if (!content) throw new ValidationError("content is required");
     const task = await Task.findById(req.params.id);
     if (!task) throw new NotFoundError("Task");
+    await _checkTaskAccess(task, req.user);
 
     task.progressUpdates.push({ content, percentage, createdBy: req.user.id });
     await task.save();
@@ -161,6 +157,7 @@ exports.addIssueReport = async (req, res, next) => {
     if (!title) throw new ValidationError("title is required");
     const task = await Task.findById(req.params.id);
     if (!task) throw new NotFoundError("Task");
+    await _checkTaskAccess(task, req.user);
 
     task.issueReports.push({ title, description: description || "", severity: severity || "medium", createdBy: req.user.id });
     await task.save();
@@ -175,6 +172,7 @@ exports.submitReview = async (req, res, next) => {
 
     const task = await Task.findById(req.params.id);
     if (!task) throw new NotFoundError("Task");
+    await _checkTaskAccess(task, req.user);
 
     task.reviewedBy = req.user.id;
     task.reviewNote = note || "";
