@@ -108,11 +108,19 @@ exports.updateProject = async (req, res, next) => {
       if (req.body[key] !== undefined) project[key] = req.body[key];
     }
 
-    // When PM changes, update their teamMembers entry too
+    // When PM changes, swap the teamMembers entry
     if (req.body.projectManagerId) {
       const newPmId = String(req.body.projectManagerId);
-      const hasPmEntry = project.teamMembers.some(m => String(m.userId) === newPmId);
-      if (!hasPmEntry) {
+      const oldPmId = project.projectManagerId ? String(project.projectManagerId) : null;
+
+      // Remove old PM from teamMembers (they were only there because they were PM)
+      if (oldPmId && oldPmId !== newPmId) {
+        project.teamMembers = project.teamMembers.filter(m => String(m.userId) !== oldPmId);
+      }
+
+      // Add new PM to teamMembers if not already present
+      const alreadyMember = project.teamMembers.some(m => String(m.userId) === newPmId);
+      if (!alreadyMember) {
         project.teamMembers.push({ userId: newPmId, projectRole: "Project Manager", addedBy: req.user.id });
       }
     }
