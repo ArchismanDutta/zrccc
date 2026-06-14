@@ -103,6 +103,9 @@ exports.updateProject = async (req, res, next) => {
     const project = await Project.findById(req.params.id);
     if (!project || project.isArchived) throw new NotFoundError("Project");
 
+    // Capture old PM before any field updates
+    const oldPmId = project.projectManagerId ? String(project.projectManagerId) : null;
+
     const allowed = ["name", "description", "type", "priority", "startDate", "endDate", "budget", "currency", "tags", "overallProgress", "projectManagerId"];
     for (const key of allowed) {
       if (req.body[key] !== undefined) project[key] = req.body[key];
@@ -111,9 +114,8 @@ exports.updateProject = async (req, res, next) => {
     // When PM changes, swap the teamMembers entry
     if (req.body.projectManagerId) {
       const newPmId = String(req.body.projectManagerId);
-      const oldPmId = project.projectManagerId ? String(project.projectManagerId) : null;
 
-      // Remove old PM from teamMembers (they were only there because they were PM)
+      // Remove old PM from teamMembers
       if (oldPmId && oldPmId !== newPmId) {
         project.teamMembers = project.teamMembers.filter(m => String(m.userId) !== oldPmId);
       }
