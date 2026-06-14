@@ -62,6 +62,14 @@ exports.listInvoices = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const _checkInvoiceAccess = async (invoice, user) => {
+  if (["super_admin", "admin"].includes(user.role)) return;
+  if (user.role === "account_manager") {
+    const client = await Client.findById(invoice.clientId).select("accountManagerId").lean();
+    if (!client || String(client.accountManagerId) !== String(user.id)) throw new NotFoundError("Invoice");
+  }
+};
+
 exports.getInvoice = async (req, res, next) => {
   try {
     const invoice = await Invoice.findById(req.params.id)
@@ -69,6 +77,7 @@ exports.getInvoice = async (req, res, next) => {
       .populate("projectId", "name projectId")
       .lean();
     if (!invoice) throw new NotFoundError("Invoice");
+    await _checkInvoiceAccess(invoice, req.user);
 
     const payments = await Payment.find({ invoiceId: invoice._id }).sort("-paymentDate").lean();
     success(res, { ...invoice, payments });
@@ -79,6 +88,7 @@ exports.updateInvoice = async (req, res, next) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) throw new NotFoundError("Invoice");
+    await _checkInvoiceAccess(invoice, req.user);
     if (invoice.status !== "draft") throw new ValidationError("Only draft invoices can be edited");
 
     const allowed = ["lineItems", "taxRate", "dueDate", "notes", "paymentTerms", "currency"];
@@ -94,6 +104,7 @@ exports.sendInvoice = async (req, res, next) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) throw new NotFoundError("Invoice");
+    await _checkInvoiceAccess(invoice, req.user);
     invoice.status = "sent";
     invoice.sentAt = new Date();
     await invoice.save();
