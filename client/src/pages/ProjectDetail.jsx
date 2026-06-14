@@ -323,7 +323,7 @@ export default function ProjectDetailPage() {
           )}
           {project.budget > 0 && (
             <span className="text-xs text-fg-3">
-              Budget: <span className="text-fg-2 font-medium">{formatCurrency(project.budget)}</span>
+              Contract: <span className="text-fg-2 font-medium">{formatCurrency(project.budget)}</span>
             </span>
           )}
         </div>
@@ -578,7 +578,7 @@ export default function ProjectDetailPage() {
             <div><label className="block text-xs font-medium text-fg-2 mb-1">Due Date</label>
             <input type="date" className="input" value={editForm.endDate || ''} onChange={e => setEditForm(f => ({ ...f, endDate: e.target.value }))} /></div>
           </div>
-          <div><label className="block text-xs font-medium text-fg-2 mb-1">Budget (₹)</label>
+          <div><label className="block text-xs font-medium text-fg-2 mb-1">Contract Value (₹)</label>
           <input type="number" className="input" value={editForm.budget || ''} onChange={e => setEditForm(f => ({ ...f, budget: e.target.value }))} /></div>
         </div>
       </Modal>

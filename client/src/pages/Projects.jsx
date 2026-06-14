@@ -28,7 +28,7 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', clientId: '', projectManagerId: '', type: [], priority: 'medium', startDate: '', endDate: '', budget: '' })
+  const [form, setForm] = useState({ name: '', clientId: '', projectManagerId: '', teamMemberIds: [], type: [], priority: 'medium', startDate: '', endDate: '', budget: '' })
   const [saving, setSaving] = useState(false)
 
   const fetchProjects = async () => {
@@ -50,12 +50,25 @@ export default function ProjectsPage() {
 
   const toggleType = t => setForm(f => ({ ...f, type: f.type.includes(t) ? f.type.filter(x => x !== t) : [...f.type, t] }))
 
+  const toggleMember = id => setForm(f => ({
+    ...f,
+    teamMemberIds: f.teamMemberIds.includes(id) ? f.teamMemberIds.filter(x => x !== id) : [...f.teamMemberIds, id],
+  }))
+
   const handleSubmit = async () => {
     if (!form.name || !form.clientId || !form.projectManagerId) { toast.error('Name, client, and PM are required'); return }
     setSaving(true)
     try {
-      await api.createProject({ ...form, budget: Number(form.budget) || 0 })
-      toast.success('Project created!'); setModalOpen(false); setForm({ name: '', clientId: '', projectManagerId: '', type: [], priority: 'medium', startDate: '', endDate: '', budget: '' }); fetchProjects()
+      const { teamMemberIds, ...rest } = form
+      const res = await api.createProject({ ...rest, budget: Number(rest.budget) || 0 })
+      const projectId = res.data?._id
+      if (projectId && teamMemberIds.length > 0) {
+        await Promise.allSettled(teamMemberIds.map(uid => api.addTeamMember(projectId, { userId: uid })))
+      }
+      toast.success('Project created!')
+      setModalOpen(false)
+      setForm({ name: '', clientId: '', projectManagerId: '', teamMemberIds: [], type: [], priority: 'medium', startDate: '', endDate: '', budget: '' })
+      fetchProjects()
     } catch (err) { toast.error(err.message) } finally { setSaving(false) }
   }
 
@@ -144,6 +157,25 @@ export default function ProjectsPage() {
             <select className="input" value={form.projectManagerId} onChange={e => setForm(f => ({ ...f, projectManagerId: e.target.value }))}>
               <option value="">Select PM</option>{users.filter(u => ['super_admin','admin','project_manager'].includes(u.role)).map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
             </select></div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-2">
+              Team Members <span className="text-fg-3 font-normal">(optional)</span>
+              {form.teamMemberIds.length > 0 && <span className="ml-1 text-accent">{form.teamMemberIds.length} selected</span>}
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {users.filter(u => u._id !== form.projectManagerId).map(u => {
+                const selected = form.teamMemberIds.includes(u._id)
+                return (
+                  <button key={u._id} type="button" onClick={() => toggleMember(u._id)}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] border transition-colors ${selected ? 'bg-accent/10 border-accent text-accent' : 'border-[var(--color-border)] text-fg-3 hover:border-[var(--color-fg-3)]'}`}>
+                    <span className="w-4 h-4 rounded-full bg-current/20 flex items-center justify-center text-[9px] font-bold">{u.name.charAt(0)}</span>
+                    {u.name}
+                  </button>
+                )
+              })}
+              {users.length === 0 && <p className="text-xs text-fg-3">No users loaded</p>}
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div><label className="block text-xs font-medium text-fg-2 mb-1">Priority</label>
