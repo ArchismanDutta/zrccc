@@ -248,6 +248,7 @@ export default function ContentPage() {
   // Drag to reschedule
   const [draggingId, setDraggingId]   = useState(null)
   const [dragOverDay, setDragOverDay] = useState(null)
+  const draggingRef = useRef(false)
 
   const plannedMonth = `${year}-${String(month + 1).padStart(2, '0')}`
 
@@ -375,14 +376,19 @@ export default function ContentPage() {
 
     // Skip if dropped on same day
     if (oldISO) {
-      const oldDay = new Date(oldISO).getUTCDate()
-      if (oldDay === dayNum) { setDraggingId(null); setDragOverDay(null); return }
+      const oldDate = new Date(oldISO)
+      if (
+        oldDate.getUTCFullYear() === year &&
+        oldDate.getUTCMonth()    === month &&
+        oldDate.getUTCDate()     === dayNum
+      ) { setDraggingId(null); setDragOverDay(null); return }
     }
 
     // Optimistic update
     setItems(prev => prev.map(i => i._id === draggingId ? { ...i, scheduledAt: newISO } : i))
     setDraggingId(null)
     setDragOverDay(null)
+    draggingRef.current = false
 
     try {
       await api.updateContent(item._id, { scheduledAt: newISO })
@@ -519,9 +525,9 @@ export default function ContentPage() {
 
               return (
                 <div key={day}
-                  onClick={() => { if (!draggingId) openCreate(dateStr) }}
+                  onClick={() => { if (!draggingRef.current) openCreate(dateStr) }}
                   onDragOver={e => { e.preventDefault(); setDragOverDay(day) }}
-                  onDragLeave={() => setDragOverDay(null)}
+                  onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverDay(null) }}
                   onDrop={e => { e.preventDefault(); handleDrop(day) }}
                   className={`group relative min-h-[52px] sm:min-h-[88px] lg:min-h-[108px] border-r border-b border-[var(--color-border)] p-0.5 sm:p-1.5 cursor-pointer transition-colors hover:bg-accent/5 ${isWeekend ? 'bg-[var(--color-surface-2)] hover:bg-accent/5' : ''} ${draggingId && dragOverDay === day ? 'ring-2 ring-inset ring-accent/50 bg-accent/5' : ''}`}>
                   {/* Day number + add hint */}
@@ -537,8 +543,8 @@ export default function ContentPage() {
                       return (
                         <button key={item._id}
                           draggable
-                          onDragStart={e => { e.stopPropagation(); setDraggingId(item._id) }}
-                          onDragEnd={e => { e.stopPropagation(); setDraggingId(null); setDragOverDay(null) }}
+                          onDragStart={e => { e.stopPropagation(); setDraggingId(item._id); draggingRef.current = true }}
+                          onDragEnd={e => { e.stopPropagation(); setDraggingId(null); setDragOverDay(null); draggingRef.current = false }}
                           onClick={e => { e.stopPropagation(); openEdit(item) }}
                           className={`w-full flex items-center gap-0.5 px-1 sm:px-1.5 py-px sm:py-0.5 rounded-md text-[8px] sm:text-[10px] font-medium truncate text-left hover:opacity-80 transition-opacity ${draggingId === item._id ? 'opacity-40' : ''}`}
                           style={{ background: `${colour}18`, color: colour, border: `1px solid ${colour}30` }}>
