@@ -133,6 +133,7 @@ exports.changeStatus = async (req, res, next) => {
     if (!status) throw new ValidationError("status is required");
     const item = await ContentItem.findById(req.params.id);
     if (!item) throw new NotFoundError("Content Item");
+    await _checkContentAccess(item, req.user);
 
     item.statusHistory.push({ from: item.status, to: status, changedBy: req.user.id, note: note || "" });
     item.status = status;
@@ -149,6 +150,7 @@ exports.approveContent = async (req, res, next) => {
   try {
     const item = await ContentItem.findById(req.params.id);
     if (!item) throw new NotFoundError("Content Item");
+    await _checkContentAccess(item, req.user);
 
     item.reviewedBy = req.user.id;
     item.reviewedAt = new Date();
@@ -181,6 +183,7 @@ exports.rejectContent = async (req, res, next) => {
     if (!feedback) throw new ValidationError("feedback is required when rejecting");
     const item = await ContentItem.findById(req.params.id);
     if (!item) throw new NotFoundError("Content Item");
+    await _checkContentAccess(item, req.user);
 
     item.reviewedBy = req.user.id;
     item.reviewedAt = new Date();
