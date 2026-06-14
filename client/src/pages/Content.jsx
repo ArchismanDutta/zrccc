@@ -401,6 +401,9 @@ export default function ContentPage() {
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
   const MAX_SHOW = isMobile ? 1 : 2
+  const filteredProjects = clientFilter
+    ? projects.filter(p => String(p.clientId?._id || p.clientId) === clientFilter)
+    : projects
 
   return (
     <div className="space-y-4 sm:space-y-5 animate-slide-up">
@@ -416,6 +419,31 @@ export default function ContentPage() {
             <span className="text-[10px] sm:text-xs text-fg-3">{l.label}</span>
           </div>
         ))}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2">
+        <select
+          className="input sm:w-48 text-sm"
+          value={clientFilter}
+          onChange={e => { setClientFilter(e.target.value); setProjectFilter('') }}>
+          <option value="">All Clients</option>
+          {clients.map(c => <option key={c._id} value={c._id}>{c.companyName}</option>)}
+        </select>
+        <select
+          className="input sm:w-48 text-sm"
+          value={projectFilter}
+          onChange={e => setProjectFilter(e.target.value)}>
+          <option value="">All Projects</option>
+          {filteredProjects.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+        </select>
+        {(clientFilter || projectFilter) && (
+          <button
+            className="btn btn-ghost text-xs text-fg-3"
+            onClick={() => { setClientFilter(''); setProjectFilter('') }}>
+            Clear filters
+          </button>
+        )}
       </div>
 
       {/* Calendar */}
