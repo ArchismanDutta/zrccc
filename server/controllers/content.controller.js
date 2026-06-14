@@ -81,6 +81,23 @@ exports.listContent = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const _checkContentAccess = async (item, user) => {
+  const role = user.role;
+  if (["super_admin", "admin", "account_manager"].includes(role)) return;
+  if (role === "client") {
+    if (String(item.clientId?._id || item.clientId) !== String(user.linkedClientId)) throw new NotFoundError("Content Item");
+    return;
+  }
+  if (role === "project_manager") {
+    const Project = require("../models/Project");
+    const onProject = await Project.exists({ _id: item.projectId?._id || item.projectId, "teamMembers.userId": user.id });
+    if (!onProject) throw new NotFoundError("Content Item");
+    return;
+  }
+  const isAssigned = (item.assignedTo || []).some(u => String(u._id || u) === String(user.id));
+  if (!isAssigned) throw new NotFoundError("Content Item");
+};
+
 exports.getContent = async (req, res, next) => {
   try {
     const item = await ContentItem.findById(req.params.id)
@@ -90,6 +107,7 @@ exports.getContent = async (req, res, next) => {
       .populate("projectId", "name projectId")
       .lean();
     if (!item) throw new NotFoundError("Content Item");
+    await _checkContentAccess(item, req.user);
     success(res, item);
   } catch (err) { next(err); }
 };
@@ -98,6 +116,7 @@ exports.updateContent = async (req, res, next) => {
   try {
     const item = await ContentItem.findById(req.params.id);
     if (!item) throw new NotFoundError("Content Item");
+    await _checkContentAccess(item, req.user);
 
     const allowed = ["title", "contentType", "platform", "caption", "hashtags", "adDetails", "assignedTo", "plannedMonth", "weekNumber", "dayOfWeek", "postingTime", "priority", "clientFacing", "requiresClientApproval", "isAdCreative", "scheduledAt"];
     for (const key of allowed) {
