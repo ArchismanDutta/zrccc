@@ -98,9 +98,13 @@ export default function ProjectsPage() {
       const res = await api.createProject({ ...rest, budget: Number(rest.budget) || 0 })
       const projectId = res.data?._id
       if (projectId && teamMemberIds.length > 0) {
-        await Promise.allSettled(teamMemberIds.map(uid => api.addTeamMember(projectId, { userId: uid })))
+        const results = await Promise.allSettled(teamMemberIds.map(uid => api.addTeamMember(projectId, { userId: uid })))
+        const failed = results.filter(r => r.status === 'rejected').length
+        if (failed > 0) toast.info(`Project created, but ${failed} team member(s) could not be added`)
+        else toast.success('Project created!')
+      } else {
+        toast.success('Project created!')
       }
-      toast.success('Project created!')
       setModalOpen(false)
       setForm({ name: '', clientId: '', projectManagerId: '', teamMemberIds: [], type: [], priority: 'medium', startDate: '', endDate: '', budget: '' })
       fetchProjects()
