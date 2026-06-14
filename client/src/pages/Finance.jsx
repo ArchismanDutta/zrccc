@@ -54,7 +54,7 @@ export default function FinancePage() {
     try {
       const [inv, chart, db, cp] = await Promise.all([api.getInvoices('?limit=100'), api.getRevenueChart(6), api.getDashboard(), api.getClientPayments()])
       setInvoices(inv.data)
-      setChartData((chart.data || []).map(d => ({ month: `${['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.month]} ${d.year}`, expected: d.expected || 0, collected: d.collected || 0 })))
+      setChartData((chart.data || []).map(d => ({ month: `${d.month} ${d.year}`, expected: d.expected || 0, collected: d.collected || 0 })))
       setDash(db.data?.kpis || {})
       setClientPayments(cp.data || [])
     } catch { toast.error('Failed to load finance data') }

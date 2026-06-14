@@ -52,8 +52,8 @@ export default function AuditLogPage() {
       if (search) params.set('search', search)
       if (entityFilter) params.set('entity', entityFilter)
       const res = await api.getAuditLogs(`?${params}`)
-      setLogs(res.data?.docs ?? [])
-      setTotal(res.data?.total ?? 0)
+      setLogs(res.data ?? [])
+      setTotal(res.pagination?.total ?? 0)
     } catch (err) {
       toast.error(err.message || 'Failed to load audit logs')
     } finally {

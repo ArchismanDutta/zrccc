@@ -117,7 +117,7 @@ export default function MyPayslipsPage() {
                       {record.paidDate && (
                         <p className="text-[11px] text-fg-3 mt-0.5">
                           Paid on {new Date(record.paidDate).toLocaleDateString()}
-                          {record.paymentMode && ` via ${record.paymentMode.replace(/_/g, ' ')}`}
+                          {record.paymentMethod && ` via ${record.paymentMethod.replace(/_/g, ' ')}`}
                         </p>
                       )}
                     </div>

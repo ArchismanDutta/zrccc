@@ -59,7 +59,7 @@ export default function DashboardPage() {
         setTasks(task.data || [])
         setContent(cont.data || [])
         if (rev) setRevenue((rev.data || []).map(d => ({
-          month: ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.month],
+          month: d.month,
           collected: d.collected || 0, expected: d.expected || 0,
         })))
         if (inv) setInvoices(inv.data || [])
