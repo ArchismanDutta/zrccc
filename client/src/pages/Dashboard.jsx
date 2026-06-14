@@ -66,7 +66,7 @@ export default function DashboardPage() {
       } catch {}
       setLoading(false)
     })()
-  }, [])
+  }, [isSuperAdmin])
 
   // Task breakdown from tasks
   const taskBreakdown = (() => {
