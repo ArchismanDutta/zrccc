@@ -70,8 +70,11 @@ export default function ProjectsPage() {
   useEffect(() => { fetchProjects() }, [])
 
   const openModal = async () => {
+    setForm({ name: '', clientId: '', projectManagerId: '', teamMemberIds: [], type: [], priority: 'medium', startDate: '', endDate: '', budget: '' })
     setModalOpen(true)
-    try { const [cl, us] = await Promise.all([api.getClients('?limit=100'), api.getUsers('?limit=100')]); setClients(cl.data); setUsers(us.data) } catch {}
+    const [clRes, usRes] = await Promise.allSettled([api.getClients('?limit=100'), api.getUsers('?limit=100')])
+    if (clRes.status === 'fulfilled') setClients(clRes.value.data || [])
+    if (usRes.status === 'fulfilled') setUsers(usRes.value.data || [])
   }
 
   const filtered = projects.filter(p => {
