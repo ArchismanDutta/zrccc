@@ -155,8 +155,25 @@ export default function ProjectsPage() {
             <div><label className="block text-xs font-medium text-fg-2 mb-1">End Date</label>
             <input type="date" className="input" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} /></div>
           </div>
-          <div><label className="block text-xs font-medium text-fg-2 mb-1">Contract Value (₹)</label>
-          <input type="number" className="input" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} /></div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-1">Contract Value (₹)</label>
+            <input type="number" className="input" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} />
+            {(() => {
+              const budget = Number(form.budget)
+              if (!budget || !form.startDate || !form.endDate) return null
+              const start = new Date(form.startDate)
+              const end   = new Date(form.endDate)
+              const months = Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.44))
+              if (months < 1) return null
+              const monthly = Math.round(budget / months)
+              return (
+                <p className="text-xs text-fg-3 mt-1.5 flex items-center gap-1">
+                  <span className="text-accent font-semibold">Rs. {monthly.toLocaleString('en-IN')}/month</span>
+                  <span>· {months} month{months !== 1 ? 's' : ''} · total Rs. {budget.toLocaleString('en-IN')}</span>
+                </p>
+              )
+            })()}
+          </div>
           <div><label className="block text-xs font-medium text-fg-2 mb-2">Service Types</label>
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {ALL_TYPES.map(t => (
