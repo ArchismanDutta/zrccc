@@ -43,6 +43,7 @@ export default function ClientsPage() {
   const totalMRR = filtered.reduce((s, c) => s + (c.contract?.monthlyValue || 0), 0)
 
   const toggleService = (svc) => setForm(f => ({ ...f, services: f.services.includes(svc) ? f.services.filter(s => s !== svc) : [...f.services, svc] }))
+  const toggleAllServices = () => setForm(f => ({ ...f, services: f.services.length === ALL_SERVICES.length ? [] : [...ALL_SERVICES] }))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -134,14 +135,22 @@ export default function ClientsPage() {
               <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="vip">VIP</option>
             </select></div>
           </div>
-          <div><label className="block text-xs font-medium text-fg-2 mb-2">Services</label>
-          <div className="flex flex-wrap gap-1.5 sm:gap-2">
-            {ALL_SERVICES.map(svc => (
-              <label key={svc} className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs cursor-pointer border transition-colors ${form.services.includes(svc) ? 'bg-accent/10 border-accent text-accent' : 'border-[var(--color-border)] text-fg-3 hover:border-[var(--color-fg-3)]'}`}>
-                <input type="checkbox" checked={form.services.includes(svc)} onChange={() => toggleService(svc)} className="sr-only" />{SERVICE_LABELS[svc]}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-medium text-fg-2">Services</label>
+              <label className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] cursor-pointer border transition-colors ${form.services.length === ALL_SERVICES.length ? 'bg-accent/10 border-accent text-accent' : 'border-[var(--color-border)] text-fg-3 hover:border-[var(--color-fg-3)]'}`}>
+                <input type="checkbox" checked={form.services.length === ALL_SERVICES.length} onChange={toggleAllServices} className="sr-only" />
+                All Services
               </label>
-            ))}
-          </div></div>
+            </div>
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
+              {ALL_SERVICES.map(svc => (
+                <label key={svc} className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] sm:text-xs cursor-pointer border transition-colors ${form.services.includes(svc) ? 'bg-accent/10 border-accent text-accent' : 'border-[var(--color-border)] text-fg-3 hover:border-[var(--color-fg-3)]'}`}>
+                  <input type="checkbox" checked={form.services.includes(svc)} onChange={() => toggleService(svc)} className="sr-only" />{SERVICE_LABELS[svc]}
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
       </Modal>
     </div>
