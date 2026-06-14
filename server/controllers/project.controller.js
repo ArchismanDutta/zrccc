@@ -103,6 +103,12 @@ exports.updateProject = async (req, res, next) => {
     const project = await Project.findById(req.params.id);
     if (!project || project.isArchived) throw new NotFoundError("Project");
 
+    const role = req.user.role;
+    if (TEAM_SCOPED_ROLES.includes(role)) {
+      const isMember = project.teamMembers.some(m => String(m.userId) === String(req.user.id));
+      if (!isMember) throw new NotFoundError("Project");
+    }
+
     // Capture old PM before any field updates
     const oldPmId = project.projectManagerId ? String(project.projectManagerId) : null;
 
