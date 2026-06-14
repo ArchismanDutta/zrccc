@@ -214,7 +214,14 @@ export default function ProjectDetailPage() {
     } catch (err) { toast.error(err.message) }
   }
 
-  const openEdit = () => {
+  const openEdit = async () => {
+    // Ensure users are loaded
+    if (!allUsers.length) {
+      try { const res = await api.getUsers('?limit=100'); setAllUsers(res.data) } catch {}
+    }
+    const currentMemberIds = (project.teamMembers || [])
+      .map(m => String(m.userId?._id || m.userId))
+      .filter(uid => uid !== String(project.projectManagerId?._id || project.projectManagerId))
     setEditForm({
       name: project.name || '',
       description: project.description || '',
@@ -223,6 +230,9 @@ export default function ProjectDetailPage() {
       endDate: project.endDate ? project.endDate.split('T')[0] : '',
       budget: project.budget || '',
       overallProgress: project.overallProgress ?? 0,
+      projectManagerId: String(project.projectManagerId?._id || project.projectManagerId || ''),
+      teamMemberIds: currentMemberIds,
+      _originalMemberIds: currentMemberIds,
     })
     setEditOpen(true)
   }
@@ -230,11 +240,21 @@ export default function ProjectDetailPage() {
   const saveEdit = async () => {
     setSaving(true)
     try {
+      const { teamMemberIds, _originalMemberIds, ...fields } = editForm
       await api.updateProject(id, {
-        ...editForm,
-        budget: Number(editForm.budget) || 0,
-        overallProgress: Number(editForm.overallProgress) || 0,
+        ...fields,
+        budget: Number(fields.budget) || 0,
+        overallProgress: Number(fields.overallProgress) || 0,
       })
+
+      // Sync team members: add new ones, remove removed ones
+      const toAdd    = teamMemberIds.filter(uid => !_originalMemberIds.includes(uid))
+      const toRemove = _originalMemberIds.filter(uid => !teamMemberIds.includes(uid))
+      await Promise.allSettled([
+        ...toAdd.map(uid => api.addTeamMember(id, { userId: uid })),
+        ...toRemove.map(uid => api.removeTeamMember(id, uid)),
+      ])
+
       toast.success('Project updated')
       setEditOpen(false)
       fetchProject()
@@ -580,6 +600,37 @@ export default function ProjectDetailPage() {
           </div>
           <div><label className="block text-xs font-medium text-fg-2 mb-1">Contract Value (₹)</label>
           <input type="number" className="input" value={editForm.budget || ''} onChange={e => setEditForm(f => ({ ...f, budget: e.target.value }))} /></div>
+          <div><label className="block text-xs font-medium text-fg-2 mb-1">Project Manager</label>
+          <select className="input" value={editForm.projectManagerId || ''} onChange={e => setEditForm(f => ({ ...f, projectManagerId: e.target.value }))}>
+            <option value="">Select PM</option>
+            {allUsers.filter(u => ['super_admin','admin','project_manager'].includes(u.role)).map(u => (
+              <option key={u._id} value={u._id}>{u.name}</option>
+            ))}
+          </select></div>
+          <div>
+            <label className="block text-xs font-medium text-fg-2 mb-2">
+              Team Members
+              {(editForm.teamMemberIds || []).length > 0 && <span className="ml-1 text-accent font-normal">{editForm.teamMemberIds.length} selected</span>}
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {allUsers.filter(u => u.role !== 'client' && u._id !== editForm.projectManagerId).map(u => {
+                const selected = (editForm.teamMemberIds || []).includes(u._id)
+                return (
+                  <button key={u._id} type="button"
+                    onClick={() => setEditForm(f => ({
+                      ...f,
+                      teamMemberIds: selected
+                        ? f.teamMemberIds.filter(x => x !== u._id)
+                        : [...(f.teamMemberIds || []), u._id],
+                    }))}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] border transition-colors ${selected ? 'bg-accent/10 border-accent text-accent' : 'border-[var(--color-border)] text-fg-3 hover:border-[var(--color-fg-3)]'}`}>
+                    <span className="w-4 h-4 rounded-full bg-current/20 flex items-center justify-center text-[9px] font-bold">{u.name.charAt(0)}</span>
+                    {u.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </Modal>
     </div>

@@ -102,10 +102,20 @@ exports.updateProject = async (req, res, next) => {
     const project = await Project.findById(req.params.id);
     if (!project || project.isArchived) throw new NotFoundError("Project");
 
-    const allowed = ["name", "description", "type", "priority", "startDate", "endDate", "budget", "currency", "tags", "overallProgress"];
+    const allowed = ["name", "description", "type", "priority", "startDate", "endDate", "budget", "currency", "tags", "overallProgress", "projectManagerId"];
     for (const key of allowed) {
       if (req.body[key] !== undefined) project[key] = req.body[key];
     }
+
+    // When PM changes, update their teamMembers entry too
+    if (req.body.projectManagerId) {
+      const newPmId = String(req.body.projectManagerId);
+      const hasPmEntry = project.teamMembers.some(m => String(m.userId) === newPmId);
+      if (!hasPmEntry) {
+        project.teamMembers.push({ userId: newPmId, projectRole: "Project Manager", addedBy: req.user.id });
+      }
+    }
+
     await project.save();
     await logAudit({ action: "project.update", entity: "Project", entityId: project._id, userId: req.user.id, details: { fields: Object.keys(req.body) }, req });
     success(res, project);
