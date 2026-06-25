@@ -51,6 +51,9 @@ class ApiClient {
   resetPassword(token, newPassword) { return this.post('/auth/reset-password', { token, newPassword }) }
   revokeAllSessions() { return this.post('/auth/revoke-all-sessions') }
   changePassword(d) { return this.post('/auth/change-password', d) }
+  getSessions() { return this.get('/auth/sessions') }
+  revokeSession(sessionId) { return this.del(`/auth/sessions/${sessionId}`) }
+  updateProfile(d) { return this.patch('/auth/profile', d) }
 
   // Clients
   getClients(q = '') { return this.get(`/clients${q}`) }
@@ -155,6 +158,7 @@ class ApiClient {
   getMessages(channelId, cursor) { return this.get(`/messages/${channelId}${cursor ? `?before=${cursor}` : ''}`) }
   sendMessage(channelId, body) { return this.post(`/messages/${channelId}`, { body }) }
   createProjectChannel(d) { return this.post('/messages/channels/project', d) }
+  createDirectChannel(userId) { return this.post('/messages/channels/direct', { userId }) }
 }
 
 export const api = new ApiClient()

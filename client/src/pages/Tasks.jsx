@@ -165,7 +165,7 @@ export default function TasksPage() {
   const [saving, setSaving]       = useState(false)
 
   const fetchTasks = async () => {
-    try { const res = await api.getTasks('?limit=200'); setTasks(res.data) }
+    try { const res = await api.getTasks('?limit=200'); setTasks(res.data || []) }
     catch { toast.error('Failed to load tasks') }
     finally { setLoading(false) }
   }
@@ -241,7 +241,7 @@ export default function TasksPage() {
     const matchProject  = projectFilter === 'all' || (t.projectId?._id || t.projectId) === projectFilter
     const matchPriority = priorityFilter === 'all' || t.priority === priorityFilter
     const matchAssignee = assigneeFilter === 'all' || (t.assignedTo || []).some(u => (u._id || u) === assigneeFilter)
-    const matchMyTasks  = !myTasks || (t.assignedTo || []).some(u => (u._id || u) === me?._id)
+    const matchMyTasks  = !myTasks || (t.assignedTo || []).some(u => (u._id || u) === (me?.id || me?._id))
     return matchSearch && matchProject && matchPriority && matchAssignee && matchMyTasks
   })
 

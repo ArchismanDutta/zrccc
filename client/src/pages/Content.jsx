@@ -259,12 +259,13 @@ export default function ContentPage() {
       if (clientFilter)  params.set('clientId', clientFilter)
       if (projectFilter) params.set('projectId', projectFilter)
       const res = await api.getContent(`?${params}`)
-      setItems(res.data)
+      setItems(res.data || [])
     } catch { toast.error('Failed to load content') }
     finally { setLoading(false) }
   }
 
   useEffect(() => { fetchContent() }, [year, month, clientFilter, projectFilter])
+  useEffect(() => { loadFormDeps() }, [])
 
   const loadFormDeps = async () => {
     if (projects.length && clients.length && users.length) return
@@ -313,9 +314,9 @@ export default function ContentPage() {
       const scheduledAt = form.scheduledDate ? new Date(form.scheduledDate).toISOString() : undefined
 
       if (editItem) {
+        // clientId and projectId cannot be changed after creation — omit them from updates
         await api.updateContent(editItem._id, {
           title: form.title, contentType: form.contentType,
-          projectId: form.projectId, clientId: form.clientId,
           platform: form.platform, assignedTo: form.assignedTo,
           caption: form.caption, hashtags,
           weekNumber: form.weekNumber, priority: form.priority,

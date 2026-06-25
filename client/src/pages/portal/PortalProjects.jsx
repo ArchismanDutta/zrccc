@@ -71,8 +71,8 @@ export default function PortalProjects() {
                   <div className="space-y-1.5">
                     {p.milestones.map(m => (
                       <div key={m._id} className="flex items-center gap-2">
-                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${m.completed ? 'bg-[var(--color-success)] border-[var(--color-success)]' : 'border-[var(--color-border)]'}`} />
-                        <span className={`text-xs ${m.completed ? 'line-through text-fg-3' : 'text-fg-2'}`}>{m.title}</span>
+                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${m.isCompleted ? 'bg-[var(--color-success)] border-[var(--color-success)]' : 'border-[var(--color-border)]'}`} />
+                        <span className={`text-xs ${m.isCompleted ? 'line-through text-fg-3' : 'text-fg-2'}`}>{m.title}</span>
                         {m.dueDate && <span className="text-[10px] text-fg-3 ml-auto">{formatDate(m.dueDate)}</span>}
                       </div>
                     ))}

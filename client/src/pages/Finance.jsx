@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
+import { useAuth } from '@/lib/auth'
 import api from '@/lib/api'
 
 const SVC_TYPES = ['social_media_management','meta_ads','reels','graphics','carousels','video_production','website_development','website_maintenance','content_writing','photography']
@@ -30,6 +31,11 @@ const EMPTY_PAY = { invoiceId: '', amount: '', paymentDate: new Date().toISOStri
 
 export default function FinancePage() {
   const { toast } = useToast()
+  const { user } = useAuth()
+  const isSuperAdmin = user?.role === 'super_admin'
+  const isAdmin      = ['super_admin', 'admin'].includes(user?.role)
+  // account_manager has invoice + payment perms but NOT finance:dashboard or client-payments
+  const isAccountManager = user?.role === 'account_manager'
   const [invoices, setInvoices] = useState([])
   const [chartData, setChartData] = useState([])
   const [dash, setDash] = useState({})
@@ -52,12 +58,23 @@ export default function FinancePage() {
 
   const fetchAll = async () => {
     try {
-      const [inv, chart, db, cp] = await Promise.all([api.getInvoices('?limit=100'), api.getRevenueChart(6), api.getDashboard(), api.getClientPayments()])
-      setInvoices(inv.data)
-      setChartData((chart.data || []).map(d => ({ month: `${d.month} ${d.year}`, expected: d.expected || 0, collected: d.collected || 0 })))
-      setDash(db.data?.kpis || {})
-      setClientPayments(cp.data || [])
-    } catch { toast.error('Failed to load finance data') }
+      // Invoices: all roles with finance access can read
+      const inv = await api.getInvoices('?limit=100')
+      setInvoices(inv.data || [])
+
+      // Revenue chart, dashboard KPIs, and client-payments require finance:dashboard / reports:read:all
+      // account_manager lacks these — fetch them only for admin+
+      if (isAdmin) {
+        const [chart, db, cp] = await Promise.all([
+          api.getRevenueChart(6),
+          api.getDashboard(),
+          api.getClientPayments(),
+        ])
+        setChartData((chart.data || []).map(d => ({ month: `${d.month} ${d.year}`, expected: d.expected || 0, collected: d.collected || 0 })))
+        setDash(db.data?.kpis || {})
+        setClientPayments(cp.data || [])
+      }
+    } catch (err) { toast.error('Failed to load finance data') }
     finally { setLoading(false) }
   }
   const fetchExpenses = async () => {
@@ -73,11 +90,11 @@ export default function FinancePage() {
     } catch { toast.error('Failed to load P&L data') }
   }
 
-  useEffect(() => { fetchAll(); fetchExpenses(); fetchPL() }, [])
+  useEffect(() => { fetchAll(); fetchExpenses(); if (isAdmin) fetchPL() }, [])
   useEffect(() => { fetchExpenses() }, [expMonth, expYear])
-  useEffect(() => { fetchPL(plMonths) }, [plMonths])
+  useEffect(() => { if (isAdmin) fetchPL(plMonths) }, [plMonths])
 
-  const openInvModal = async () => { setInvForm({ ...EMPTY_INV }); setInvModalOpen(true); try { const c = await api.getClients('?limit=100'); setClients(c.data) } catch {} }
+  const openInvModal = async () => { setInvForm({ ...EMPTY_INV }); setInvModalOpen(true); try { const c = await api.getClients('?limit=100'); setClients(c.data || []) } catch (err) { toast.error(err.message || 'Failed to load clients') } }
   const openPayModal = (inv) => { setPayForm({ invoiceId: inv._id, amount: inv.totalAmount - inv.paidAmount, paymentDate: new Date().toISOString().split('T')[0], paymentMethod: 'bank_transfer', transactionRef: '', notes: '' }); setPayModalOpen(true) }
 
   const addLine = () => setInvForm(f => ({ ...f, lineItems: [...f.lineItems, { ...EMPTY_LINE }] }))
@@ -181,7 +198,12 @@ export default function FinancePage() {
 
       {/* Tab switcher */}
       <div className="flex gap-1 p-1 rounded-xl bg-[var(--color-surface-2)] w-fit">
-        {[['invoices', 'Invoices'], ['client-payments', 'Client Payments'], ['expenses', 'Expenses'], ['pl', 'P & L']].map(([key, label]) => (
+        {[
+        ['invoices', 'Invoices'],
+        ...(isAdmin ? [['client-payments', 'Client Payments']] : []),
+        ['expenses', 'Expenses'],
+        ...(isAdmin ? [['pl', 'P & L']] : []),
+      ].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === key ? 'bg-[var(--color-surface)] text-fg shadow-sm' : 'text-fg-3 hover:text-fg'}`}>
             {label}

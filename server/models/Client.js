@@ -18,13 +18,13 @@ const ownershipChangeSchema = new mongoose.Schema({
 }, { _id: false });
 
 const contractSchema = new mongoose.Schema({
-  monthlyValue: { type: Number, default: 0 },
+  monthlyValue: { type: Number, default: 0, min: [0, "Monthly value cannot be negative"] },
   currency:     { type: String, enum: ["INR", "USD", "AED", "GBP"], default: "INR" },
   billingCycle: { type: String, enum: ["monthly", "quarterly", "annually", "one_time"], default: "monthly" },
   startDate:    { type: Date },
   endDate:      { type: Date },
   autoRenew:    { type: Boolean, default: false },
-  totalValue:   { type: Number, default: 0 },
+  totalValue:   { type: Number, default: 0, min: [0, "Total value cannot be negative"] },
   terms:        { type: String, default: "" },
 }, { _id: false });
 

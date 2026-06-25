@@ -8,9 +8,6 @@ const required = [
   "MONGODB_URI",
   "JWT_ACCESS_SECRET",
   "JWT_REFRESH_SECRET",
-];
-
-const requiredInProduction = [
   "RESET_TOKEN_SECRET",
 ];
 
@@ -20,13 +17,20 @@ if (missing.length) {
   process.exit(1);
 }
 
+// Secrets must be long enough to resist brute-force (≥32 chars)
+const SECRETS = ["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "RESET_TOKEN_SECRET"];
+const weakSecrets = SECRETS.filter((k) => (process.env[k] || "").length < 32);
+if (weakSecrets.length) {
+  const msg = `These secrets are too short (minimum 32 characters): ${weakSecrets.join(", ")}`;
+  if (isProduction) { console.error(`❌ ${msg}`); process.exit(1); }
+  else console.warn(`⚠️  ${msg}`);
+}
+
+// Warn if localhost origins slip into a production deploy
 if (isProduction) {
-  const missingProd = requiredInProduction.filter((key) => !process.env[key]);
-  if (missingProd.length) {
-    console.error(
-      `❌ Missing required production env variables: ${missingProd.join(", ")}`
-    );
-    process.exit(1);
+  const rawOrigins = process.env.FRONTEND_ORIGINS || "";
+  if (rawOrigins.includes("localhost") || rawOrigins.includes("127.0.0.1")) {
+    console.warn("⚠️  WARNING: FRONTEND_ORIGINS contains a localhost address in production.");
   }
 }
 

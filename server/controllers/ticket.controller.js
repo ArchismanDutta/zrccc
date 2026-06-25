@@ -4,6 +4,10 @@ const Client = require("../models/Client");
 const { success, created, paginated } = require("../utils/response");
 const { ValidationError, NotFoundError, ForbiddenError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
+const { sanitizeSort, parsePagination } = require("../utils/sanitize");
+const { sendNotification } = require("../services/notification.service");
+
+const TICKET_SORTS = ["-createdAt", "createdAt", "-updatedAt", "updatedAt", "priority", "-priority"];
 
 // POST /api/tickets — client raises a ticket
 exports.createTicket = async (req, res, next) => {
@@ -50,7 +54,8 @@ exports.createTicket = async (req, res, next) => {
 // GET /api/tickets — list tickets (clients see own, team sees all)
 exports.listTickets = async (req, res, next) => {
   try {
-    const { page = 1, limit = 50, status, clientId, priority, sort = "-createdAt" } = req.query;
+    const { page = 1, limit = 50, status, clientId, priority } = req.query;
+    const sort = sanitizeSort(req.query.sort, TICKET_SORTS, "-createdAt");
     const filter = {};
 
     // Client role scoping
@@ -64,8 +69,7 @@ exports.listTickets = async (req, res, next) => {
     if (status) filter.status = status;
     if (priority) filter.priority = priority;
 
-    const safeLimit = Math.min(parseInt(limit) || 20, 200);
-    const skip = (parseInt(page) - 1) * safeLimit;
+    const { page: safePage, limit: safeLimit, skip } = parsePagination(page, limit, 20);
     const [docs, total] = await Promise.all([
       SupportTicket.find(filter)
         .populate("clientId", "companyName displayName")
@@ -75,7 +79,7 @@ exports.listTickets = async (req, res, next) => {
       SupportTicket.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
+    paginated(res, { docs, total, page: safePage, limit: safeLimit });
   } catch (err) { next(err); }
 };
 
@@ -99,11 +103,14 @@ exports.getTicketById = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const TICKET_STATUSES = ["open", "in_progress", "resolved"];
+
 // PATCH /api/tickets/:id/status — update status (team only)
 exports.updateTicketStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
     if (!status) throw new ValidationError("status is required");
+    if (!TICKET_STATUSES.includes(status)) throw new ValidationError(`Invalid status. Allowed: ${TICKET_STATUSES.join(", ")}`);
 
     const ticket = await SupportTicket.findById(req.params.id);
     if (!ticket) throw new NotFoundError("Ticket");
@@ -147,6 +154,7 @@ exports.addReply = async (req, res, next) => {
   try {
     const { message } = req.body;
     if (!message) throw new ValidationError("message is required");
+    if (message.length > 5000) throw new ValidationError("Reply message must not exceed 5000 characters");
 
     const ticket = await SupportTicket.findById(req.params.id)
       .populate("clientId", "companyName contactEmail accountManagerId");
@@ -178,6 +186,34 @@ exports.addReply = async (req, res, next) => {
       action: "ticket.reply", entity: "SupportTicket", entityId: ticket._id,
       userId: req.user.id, details: { ticketId: ticket.ticketId }, req,
     });
+
+    // Notify the other party via socket
+    const io = req.app.get("io");
+    const isClientReplying = req.user.role === "client";
+    if (isClientReplying) {
+      // Client replied → notify the assigned agent (or ticket creator if different)
+      const recipient = ticket.assignedTo || ticket.raisedBy;
+      if (recipient && String(recipient) !== String(req.user.id)) {
+        await sendNotification(io, recipient, {
+          type: "ticket_reply",
+          title: "New reply on ticket",
+          body: ticket.title,
+          link: `/tickets`,
+          data: { ticketId: ticket._id },
+        });
+      }
+    } else {
+      // Team replied → notify the ticket raiser
+      if (ticket.raisedBy && String(ticket.raisedBy) !== String(req.user.id)) {
+        await sendNotification(io, ticket.raisedBy, {
+          type: "ticket_reply",
+          title: "Support replied to your ticket",
+          body: ticket.title,
+          link: "/portal/tickets",
+          data: { ticketId: ticket._id },
+        });
+      }
+    }
 
     // Re-populate replies for response
     await ticket.populate("replies.userId", "name avatar role");

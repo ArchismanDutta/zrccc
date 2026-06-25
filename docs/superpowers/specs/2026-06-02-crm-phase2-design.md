@@ -393,11 +393,10 @@ client/src/App.jsx                  (+portal routes + role detection)
 client/src/lib/api.js               (+all new endpoints)
 ```
 
----
 
-## 8. Constraints & Decisions
 
-- **YAGNI:** No leave management, no attendance tracking, no API-based social metrics (Phase 3)
+
+
 - **No new UI component library** — use existing Tailwind + Radix + Recharts setup
 - **Permissions:** New routes use existing permission strings (`finance:dashboard` for expenses/salaries, `portal:access` for client portal routes)
 - **PDF:** pdfkit generates payslip, saved to `uploads/payslips/`. No S3 — local filesystem only for now.

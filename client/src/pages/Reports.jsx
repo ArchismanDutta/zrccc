@@ -10,6 +10,7 @@ import { ProgressBar } from '@/components/ui/Progress'
 import { Avatar } from '@/components/ui/Avatar'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
+import { useToast } from '@/components/ui/Toast'
 import api from '@/lib/api'
 
 const PIE_COLOURS = [
@@ -397,6 +398,7 @@ function TasksContentTab({ kpis, contentStats, tasks }) {
 // ─── Main Page ────────────────────────────────────────────────
 export default function ReportsPage() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const isSuperAdmin = user?.role === 'super_admin'
 
   const [tab, setTab] = useState(isSuperAdmin ? 'business' : 'projects')
@@ -430,7 +432,10 @@ export default function ReportsPage() {
           expected: d.expected || 0,
         })))
         if (cli) setClients(cli.data || [])
-      } catch {}
+      } catch (err) {
+        console.error('Reports fetch failed:', err)
+        toast.error('Failed to load report data')
+      }
       setLoading(false)
     })()
   }, [])

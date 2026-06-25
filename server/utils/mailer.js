@@ -128,10 +128,11 @@ async function sendSalaryPaidEmail(employee, salaryRecord) {
 
   const attachments = [];
   if (salaryRecord.payslipUrl) {
-    const filePath = path.join(__dirname, "..", salaryRecord.payslipUrl);
     try {
       const fs = require("fs");
-      if (fs.existsSync(filePath)) {
+      const allowedDir = path.resolve(__dirname, "..", "uploads", "payslips");
+      const filePath   = path.resolve(__dirname, "..", salaryRecord.payslipUrl);
+      if (filePath.startsWith(allowedDir + path.sep) && fs.existsSync(filePath)) {
         attachments.push({
           filename: `Payslip-${salaryRecord.salaryId}.pdf`,
           path: filePath,

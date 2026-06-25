@@ -1,6 +1,9 @@
 // controllers/client.controller.js
 const Client = require("../models/Client");
 const { nextSequence } = require("../models/Counter");
+const { escapeRegex, sanitizeSort, isValidUrl, parsePagination } = require("../utils/sanitize");
+
+const CLIENT_SORTS = ["-createdAt", "createdAt", "companyName", "-companyName", "-updatedAt", "updatedAt"];
 const { success, created, paginated } = require("../utils/response");
 const { ValidationError, NotFoundError, ForbiddenError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
@@ -10,6 +13,7 @@ exports.createClient = async (req, res, next) => {
   try {
     const { companyName, contactName, contactEmail, services, contract, priority } = req.body;
     if (!companyName) throw new ValidationError("companyName is required");
+    if (!isValidUrl(req.body.website)) throw new ValidationError("website must be a valid http/https URL");
 
     const seq = await nextSequence("client");
     const clientId = `ZRC-CLT-${String(seq).padStart(5, "0")}`;
@@ -32,7 +36,9 @@ exports.createClient = async (req, res, next) => {
       priority: priority || "medium",
       status: "prospect",
       statusHistory: [{ to: "prospect", changedBy: req.user.id }],
-      accountManagerId: req.body.accountManagerId || req.user.id,
+      accountManagerId: (["super_admin", "admin"].includes(req.user.role) && req.body.accountManagerId)
+        ? req.body.accountManagerId
+        : req.user.id,
       enteredBy: req.user.id,
     });
 
@@ -50,7 +56,8 @@ exports.createClient = async (req, res, next) => {
 // GET /api/clients
 exports.listClients = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, status, search, sort = "-createdAt" } = req.query;
+    const { page = 1, limit = 20, status, search } = req.query;
+    const sort = sanitizeSort(req.query.sort, CLIENT_SORTS, "-createdAt");
     const filter = { isArchived: false };
 
     if (status) filter.status = status;
@@ -65,15 +72,15 @@ exports.listClients = async (req, res, next) => {
     }
 
     if (search) {
+      const s = escapeRegex(search);
       filter.$or = [
-        { companyName: { $regex: search, $options: "i" } },
-        { contactName: { $regex: search, $options: "i" } },
-        { displayName: { $regex: search, $options: "i" } },
+        { companyName: { $regex: s, $options: "i" } },
+        { contactName: { $regex: s, $options: "i" } },
+        { displayName: { $regex: s, $options: "i" } },
       ];
     }
 
-    const safeLimit = Math.min(parseInt(limit) || 20, 200);
-    const skip = (parseInt(page) - 1) * safeLimit;
+    const { page: safePage, limit: safeLimit, skip } = parsePagination(page, limit, 20);
     const [docs, total] = await Promise.all([
       Client.find(filter)
         .populate("accountManagerId", "name email avatar")
@@ -84,7 +91,7 @@ exports.listClients = async (req, res, next) => {
       Client.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
+    paginated(res, { docs, total, page: safePage, limit: safeLimit });
   } catch (err) {
     next(err);
   }
@@ -139,6 +146,13 @@ exports.updateClient = async (req, res, next) => {
       delete data.accountManagerId;
     }
 
+    if (data.website !== undefined && !isValidUrl(data.website)) {
+      throw new ValidationError("website must be a valid http/https URL");
+    }
+    if (data.logo !== undefined && !isValidUrl(data.logo)) {
+      throw new ValidationError("logo must be a valid http/https URL");
+    }
+
     for (const key of Object.keys(data)) {
       client[key] = data[key];
     }
@@ -156,11 +170,14 @@ exports.updateClient = async (req, res, next) => {
   }
 };
 
+const CLIENT_STATUSES = ["prospect", "onboarding", "active", "paused", "churned", "reactivated"];
+
 // PATCH /api/clients/:id/status
 exports.changeStatus = async (req, res, next) => {
   try {
     const { status, reason } = req.body;
     if (!status) throw new ValidationError("status is required");
+    if (!CLIENT_STATUSES.includes(status)) throw new ValidationError(`Invalid status. Allowed: ${CLIENT_STATUSES.join(", ")}`);
 
     const client = await Client.findById(req.params.id);
     if (!client) throw new NotFoundError("Client");

@@ -13,6 +13,7 @@ import { ProgressRing } from '@/components/ui/Progress'
 import { Avatar } from '@/components/ui/Avatar'
 import { formatCurrency } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
+import { useToast } from '@/components/ui/Toast'
 import api from '@/lib/api'
 
 const CONTENT_TYPE_ICON = { reel: Video, carousel: Image, meta_ad_creative: Star, static_post: Image, video: Video, story: Image, default: Calendar }
@@ -31,6 +32,7 @@ function CustomTooltip({ active, payload, label }) {
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const [kpis, setKpis] = useState({})
   const [revenue, setRevenue] = useState([])
   const [projects, setProjects] = useState([])
@@ -47,8 +49,8 @@ export default function DashboardPage() {
         const base = [
           api.getDashboard(),
           api.getProjects('?status=active&limit=4'),
-          api.getTasks('?status=todo,in_progress,review&limit=5&sort=-priority'),
-          api.getContent('?status=in_review,revision_needed,approved&limit=4'),
+          api.getTasks('?limit=5&sort=-priority'),
+          api.getContent('?limit=4'),
         ]
         const financePromises = isSuperAdmin
           ? [api.getRevenueChart(6), api.getInvoices('?status=overdue,partial,sent&limit=4')]
@@ -63,7 +65,10 @@ export default function DashboardPage() {
           collected: d.collected || 0, expected: d.expected || 0,
         })))
         if (inv) setInvoices(inv.data || [])
-      } catch {}
+      } catch (err) {
+        console.error('Dashboard fetch failed:', err)
+        toast.error('Failed to load dashboard data')
+      }
       setLoading(false)
     })()
   }, [isSuperAdmin])
@@ -87,7 +92,7 @@ export default function DashboardPage() {
         {isSuperAdmin && <StatCard label="Active Clients" value={kpis.activeClients ?? 0} sub={`${kpis.onboardingClients ?? 0} onboarding`} icon={Users} variant="accent" />}
         <StatCard label="Active Projects" value={kpis.activeProjects ?? 0} sub={`${kpis.dueTodayTasks ?? 0} tasks due today`} icon={Briefcase} variant="success" />
         {isSuperAdmin && <StatCard label="Revenue" value={formatCurrency(kpis.collectedThisMonth || 0)} sub={`Expected ${formatCurrency(kpis.expectedMRR || 0)}`} icon={DollarSign} variant="warning" />}
-        <StatCard label="Open Tasks" value={kpis.openTasks ?? 0} sub={`${kpis.pendingTasks ?? 0} pending`} icon={CheckSquare} variant="danger" />
+        <StatCard label="Open Tasks" value={kpis.openTasks ?? 0} sub={`${kpis.dueTodayTasks ?? 0} due today`} icon={CheckSquare} variant="danger" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">

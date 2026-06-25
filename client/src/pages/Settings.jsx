@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Palette, Moon, Sun, User, Bell, Shield, Building2, Users, Check, Search, Plus } from 'lucide-react'
+import { Palette, Moon, Sun, User, Bell, Shield, Building2, Users, Check, Search, Plus, Monitor, Smartphone, Globe } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/Cards'
 import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
@@ -21,7 +21,7 @@ const SETTINGS_NAV = [
 const ROLES = [
   'super_admin','admin','project_manager','dept_head','account_manager',
   'social_media_manager','graphic_designer','video_editor','cinematographer',
-  'content_writer','web_developer','employee',
+  'content_writer','web_developer','employee','client',
 ]
 const ROLE_LABEL = {
   super_admin: 'Super Admin', admin: 'Admin', project_manager: 'Project Manager',
@@ -29,6 +29,7 @@ const ROLE_LABEL = {
   social_media_manager: 'Social Media Mgr', graphic_designer: 'Graphic Designer',
   video_editor: 'Video Editor', cinematographer: 'Cinematographer',
   content_writer: 'Content Writer', web_developer: 'Web Developer', employee: 'Employee',
+  client: 'Client Portal User',
 }
 
 const ROLE_LEVEL = {
@@ -98,21 +99,25 @@ function AppearanceSection({ currentThemeId, onThemeChange, isDark, onDarkChange
 // ─── Team & Roles ─────────────────────────────────────────────
 function TeamSection() {
   const { toast } = useToast()
+  const { user: currentUser } = useAuth()
+  const isSuperAdmin = currentUser?.role === 'super_admin'
   const [users, setUsers] = useState([])
   const [departments, setDepartments] = useState([])
+  const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editUser, setEditUser] = useState(null)
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'employee', departmentId: '', phone: '', salary: '' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'employee', departmentId: '', phone: '', salary: '', linkedClientId: '' })
   const [saving, setSaving] = useState(false)
 
   const fetchData = async () => {
     try {
-      const [u, d] = await Promise.all([api.getUsers('?limit=100'), api.getDepartments()])
+      const [u, d, c] = await Promise.all([api.getUsers('?limit=100'), api.getDepartments(), api.getClients('?limit=200&isArchived=false')])
       setUsers(u.data || [])
       setDepartments(d.data || [])
+      setClients(c.data || [])
     } catch { toast.error('Failed to load team') }
     finally { setLoading(false) }
   }
@@ -120,12 +125,12 @@ function TeamSection() {
 
   const openCreate = () => {
     setEditUser(null)
-    setForm({ name: '', email: '', password: '', role: 'employee', departmentId: '', phone: '', salary: '' })
+    setForm({ name: '', email: '', password: '', role: 'employee', departmentId: '', phone: '', salary: '', linkedClientId: '' })
     setModalOpen(true)
   }
   const openEdit = (u) => {
     setEditUser(u)
-    setForm({ name: u.name, email: u.email, password: '', role: u.role, departmentId: u.departmentId?._id || '', phone: u.phone || '', salary: u.salary || '' })
+    setForm({ name: u.name, email: u.email, password: '', role: u.role, departmentId: u.departmentId?._id || '', phone: u.phone || '', salary: u.salary || '', linkedClientId: u.linkedClientId || '' })
     setModalOpen(true)
   }
 
@@ -135,10 +140,16 @@ function TeamSection() {
     setSaving(true)
     try {
       if (editUser) {
-        await api.updateUser(editUser._id, { name: form.name, role: form.role, departmentId: form.departmentId || null, phone: form.phone, salary: Number(form.salary) || 0 })
+        if (form.role === 'client' && !form.linkedClientId) { toast.error('Please select the linked client account'); setSaving(false); return }
+        await api.updateUser(editUser._id, {
+          name: form.name, role: form.role, departmentId: form.departmentId || null,
+          phone: form.phone, salary: Number(form.salary) || 0,
+          ...(form.role === 'client' && { linkedClientId: form.linkedClientId }),
+        })
         toast.success('User updated')
       } else {
-        await api.createUser({ name: form.name, email: form.email, password: form.password, role: form.role, departmentId: form.departmentId || null, phone: form.phone, salary: Number(form.salary) || 0 })
+        if (form.role === 'client' && !form.linkedClientId) { toast.error('Please select the linked client account'); setSaving(false); return }
+        await api.createUser({ name: form.name, email: form.email, password: form.password, role: form.role, departmentId: form.departmentId || null, phone: form.phone, salary: Number(form.salary) || 0, linkedClientId: form.linkedClientId || undefined })
         toast.success('User created')
       }
       setModalOpen(false)
@@ -265,15 +276,32 @@ function TeamSection() {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {form.role === 'client' && (
+            <div>
+              <label className="block text-xs font-medium text-fg-2 mb-1">Linked Client Account *</label>
+              <select className="input text-sm" value={form.linkedClientId} onChange={e => setForm(f => ({ ...f, linkedClientId: e.target.value }))}
+                disabled={!!editUser && !!editUser.linkedClientId}>
+                <option value="">Select client…</option>
+                {clients.map(c => <option key={c._id} value={c._id}>{c.companyName || c.displayName}</option>)}
+              </select>
+              <p className="text-[11px] text-fg-3 mt-1">
+                {editUser && editUser.linkedClientId
+                  ? 'Linked client cannot be changed after creation.'
+                  : 'This user will only see data for the selected client.'}
+              </p>
+            </div>
+          )}
+          <div className={`grid grid-cols-1 gap-3 ${isSuperAdmin ? 'sm:grid-cols-2' : ''}`}>
             <div>
               <label className="block text-xs font-medium text-fg-2 mb-1">Phone</label>
               <input className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-fg-2 mb-1">Base Salary (₹)</label>
-              <input type="number" className="input" placeholder="Monthly salary" value={form.salary} onChange={e => setForm(f => ({ ...f, salary: e.target.value }))} />
-            </div>
+            {isSuperAdmin && (
+              <div>
+                <label className="block text-xs font-medium text-fg-2 mb-1">Base Salary (₹)</label>
+                <input type="number" className="input" placeholder="Monthly salary" value={form.salary} onChange={e => setForm(f => ({ ...f, salary: e.target.value }))} />
+              </div>
+            )}
           </div>
         </div>
       </Modal>
@@ -295,7 +323,7 @@ function ProfileSection() {
     if (!form.name.trim()) { toast.error('Name is required'); return }
     setSaving(true)
     try {
-      await api.updateUser(user._id, { name: form.name.trim(), phone: form.phone.trim() })
+      await api.updateProfile({ name: form.name.trim(), phone: form.phone.trim() })
       await refreshUser()
       toast.success('Profile updated')
     } catch (err) { toast.error(err.message || 'Failed to update profile') }
@@ -375,10 +403,61 @@ function ProfileSection() {
 }
 
 // ─── Security ─────────────────────────────────────────────────
+function parseDevice(userAgent = '') {
+  if (!userAgent) return { icon: Globe, label: 'Unknown device' }
+  const ua = userAgent.toLowerCase()
+  if (/mobile|android|iphone|ipad/.test(ua)) return { icon: Smartphone, label: 'Mobile' }
+  return { icon: Monitor, label: 'Desktop' }
+}
+
+function parseBrowser(userAgent = '') {
+  if (!userAgent) return ''
+  const ua = userAgent.toLowerCase()
+  if (ua.includes('chrome') && !ua.includes('edg')) return 'Chrome'
+  if (ua.includes('firefox')) return 'Firefox'
+  if (ua.includes('safari') && !ua.includes('chrome')) return 'Safari'
+  if (ua.includes('edg')) return 'Edge'
+  return ''
+}
+
+function timeAgo(date) {
+  if (!date) return ''
+  const diff = Date.now() - new Date(date).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
 function SecuritySection() {
   const { toast } = useToast()
   const { logout } = useAuth()
+  const [sessions, setSessions] = useState([])
+  const [loading, setLoading] = useState(true)
   const [revoking, setRevoking] = useState(false)
+  const [revokingId, setRevokingId] = useState(null)
+
+  const fetchSessions = async () => {
+    try {
+      const data = await api.getSessions()
+      setSessions(data.data?.sessions || [])
+    } catch { /* silently skip if endpoint unavailable */ }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { fetchSessions() }, [])
+
+  const handleRevokeSession = async (sessionId) => {
+    setRevokingId(sessionId)
+    try {
+      await api.revokeSession(sessionId)
+      setSessions(s => s.filter(x => x.sessionId !== sessionId))
+      toast.success('Session revoked')
+    } catch (err) {
+      toast.error(err.message || 'Failed to revoke session')
+    } finally { setRevokingId(null) }
+  }
 
   const handleRevokeAll = async () => {
     if (!confirm('Sign out of all devices? This will end all active sessions.')) return
@@ -394,11 +473,59 @@ function SecuritySection() {
 
   return (
     <div className="space-y-4">
-      <SectionCard title="Session Management" subtitle="Control access to your account across all devices">
+      <SectionCard title="Active Sessions" subtitle="Devices currently signed in to your account">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+          </div>
+        ) : sessions.length === 0 ? (
+          <p className="text-sm text-fg-3 py-4 text-center">No active sessions found</p>
+        ) : (
+          <div className="divide-y divide-[var(--color-border)]">
+            {sessions.map(s => {
+              const { icon: DeviceIcon, label: deviceLabel } = parseDevice(s.userAgent)
+              const browser = parseBrowser(s.userAgent)
+              return (
+                <div key={s.sessionId} className="flex items-center gap-3 py-3">
+                  <div className="w-9 h-9 rounded-xl bg-[var(--color-surface-3)] flex items-center justify-center flex-shrink-0">
+                    <DeviceIcon size={18} className="text-fg-3" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium text-fg">
+                        {browser ? `${browser} · ${deviceLabel}` : deviceLabel}
+                      </p>
+                      {s.isCurrent && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-accent-ghost text-accent">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-fg-3 truncate">
+                      {s.ip || 'Unknown IP'} · Last active {timeAgo(s.lastUsedAt)}
+                    </p>
+                  </div>
+                  {!s.isCurrent && (
+                    <button
+                      onClick={() => handleRevokeSession(s.sessionId)}
+                      disabled={revokingId === s.sessionId}
+                      className="btn btn-ghost btn-sm text-xs flex-shrink-0"
+                      style={{ color: 'var(--color-danger, #ef4444)' }}>
+                      {revokingId === s.sessionId ? 'Revoking…' : 'Revoke'}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Sign Out Everywhere" subtitle="Immediately invalidate all sessions including this device">
         <div className="space-y-4">
           <p className="text-sm text-fg-2">
-            Signing out of all devices will immediately invalidate all active sessions,
-            including the current one. You will need to sign in again.
+            Use this if you suspect unauthorised access. All sessions will be ended and
+            you will need to sign in again on every device.
           </p>
           <button onClick={handleRevokeAll} disabled={revoking}
             className="btn btn-secondary text-sm gap-2"

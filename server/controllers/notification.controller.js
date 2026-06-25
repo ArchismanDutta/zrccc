@@ -5,11 +5,12 @@ const { success } = require("../utils/response");
 exports.getMyNotifications = async (req, res, next) => {
   try {
     const { limit = 30, unreadOnly } = req.query;
+    const safeLimit = Math.min(parseInt(limit) || 30, 200);
     const filter = { userId: req.user.id };
     if (unreadOnly === "true") filter.isRead = false;
 
     const docs = await Notification.find(filter)
-      .sort("-createdAt").limit(parseInt(limit)).lean();
+      .sort("-createdAt").limit(safeLimit).lean();
     const unread = await Notification.countDocuments({ userId: req.user.id, isRead: false });
     success(res, { notifications: docs, unreadCount: unread });
   } catch (err) { next(err); }

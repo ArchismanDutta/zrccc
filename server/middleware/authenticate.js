@@ -50,7 +50,7 @@ const authenticate = async (req, _res, next) => {
     }
     if (!token) return next(new AuthenticationError("No token provided"));
 
-    const decoded = jwt.verify(token, JWT_ACCESS_SECRET);
+    const decoded = jwt.verify(token, JWT_ACCESS_SECRET, { algorithms: ["HS256"] });
 
     const dbState = await getDbState(decoded.id);
     if (!dbState)          return next(new AuthenticationError("User account not found"));
@@ -78,6 +78,7 @@ const authenticate = async (req, _res, next) => {
       role:           roleSlug,
       roleLevel:      dbState.roleLevel,
       tokenVersion:   decoded.tokenVersion ?? 0,
+      sessionId:      decoded.sessionId ?? null,
       linkedClientId: dbState.linkedClientId,
       permissions,
     };

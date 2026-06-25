@@ -1,10 +1,12 @@
 // models/Task.js
 const mongoose = require("mongoose");
 
+const ATTACHMENT_URL = { type: String, match: [/^https?:\/\//, "Attachment URL must start with http:// or https://"] };
+
 const progressUpdateSchema = new mongoose.Schema({
   content:     { type: String, required: true },
   percentage:  { type: Number, min: 0, max: 100 },
-  attachments: [{ url: String, name: String, type: String }],
+  attachments: [{ url: ATTACHMENT_URL, name: String, type: String }],
   createdBy:   { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   createdAt:   { type: Date, default: Date.now },
 }, { _id: true });
@@ -12,8 +14,8 @@ const progressUpdateSchema = new mongoose.Schema({
 const issueReportSchema = new mongoose.Schema({
   title:       { type: String, required: true },
   description: { type: String, default: "" },
-  severity:    { type: String, enum: ["low", "medium", "high", "blocking"], default: "medium" },
-  attachments: [{ url: String, name: String, type: String }],
+  severity:    { type: String, enum: ["low", "medium", "high", "critical"], default: "medium" },
+  attachments: [{ url: ATTACHMENT_URL, name: String, type: String }],
   status:      { type: String, enum: ["open", "resolved"], default: "open" },
   resolvedBy:  { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   resolvedAt:  { type: Date },
@@ -51,12 +53,12 @@ const taskSchema = new mongoose.Schema({
   priority: { type: String, enum: ["low", "medium", "high", "urgent"], default: "medium" },
 
   dueDate:        { type: Date },
-  estimatedHours: { type: Number, default: 0 },
-  actualHours:    { type: Number, default: 0 },
+  estimatedHours: { type: Number, default: 0, min: [0, "Estimated hours cannot be negative"] },
+  actualHours:    { type: Number, default: 0, min: [0, "Actual hours cannot be negative"] },
   startedAt:      { type: Date },
   completedAt:    { type: Date },
 
-  attachments:     [{ url: String, name: String, type: String, uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, uploadedAt: { type: Date, default: Date.now } }],
+  attachments:     [{ url: ATTACHMENT_URL, name: String, type: String, uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, uploadedAt: { type: Date, default: Date.now } }],
   progressUpdates: [progressUpdateSchema],
   issueReports:    [issueReportSchema],
 

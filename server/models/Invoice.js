@@ -4,9 +4,9 @@ const mongoose = require("mongoose");
 const lineItemSchema = new mongoose.Schema({
   description: { type: String, required: true },
   serviceType: { type: String, default: "" },
-  quantity:    { type: Number, default: 1 },
-  unitPrice:   { type: Number, required: true },
-  amount:      { type: Number, required: true },
+  quantity:    { type: Number, default: 1,  min: [0, "quantity cannot be negative"] },
+  unitPrice:   { type: Number, required: true, min: [0, "unitPrice cannot be negative"] },
+  amount:      { type: Number, required: true, min: [0, "amount cannot be negative"] },
 }, { _id: true });
 
 const invoiceSchema = new mongoose.Schema({
@@ -16,11 +16,11 @@ const invoiceSchema = new mongoose.Schema({
   projectId:     { type: mongoose.Schema.Types.ObjectId, ref: "Project" },
 
   month: { type: Number, min: 1, max: 12 },
-  year:  { type: Number },
+  year:  { type: Number, min: 2000, max: 2200 },
 
   lineItems:  [lineItemSchema],
   subtotal:   { type: Number, default: 0 },
-  taxRate:    { type: Number, default: 18 },   // GST %
+  taxRate:    { type: Number, default: 18, min: [0, "taxRate cannot be negative"], max: [100, "taxRate cannot exceed 100%"] },
   taxAmount:  { type: Number, default: 0 },
   totalAmount: { type: Number, default: 0 },
   paidAmount:  { type: Number, default: 0 },
@@ -36,8 +36,9 @@ const invoiceSchema = new mongoose.Schema({
   notes:        { type: String, default: "" },
   paymentTerms: { type: String, default: "Net 15" },
 
-  sentAt:    { type: Date },
-  paidAt:    { type: Date },
+  sentAt:       { type: Date },
+  paidAt:       { type: Date },
+  cancelReason: { type: String, default: "" },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   lastReminderSentAt: { type: Date, default: null },
 }, { timestamps: true });
@@ -53,9 +54,9 @@ invoiceSchema.set("toObject", { virtuals: true });
 // Pre-save: auto-calculate subtotal, tax, total
 invoiceSchema.pre("save", function (next) {
   if (this.lineItems && this.lineItems.length > 0) {
-    this.subtotal = this.lineItems.reduce((s, item) => s + item.amount, 0);
-    this.taxAmount = Math.round(this.subtotal * (this.taxRate / 100));
-    this.totalAmount = this.subtotal + this.taxAmount;
+    this.subtotal    = Math.round(this.lineItems.reduce((s, item) => s + item.amount, 0) * 100) / 100;
+    this.taxAmount   = Math.round(this.subtotal * (this.taxRate / 100) * 100) / 100;
+    this.totalAmount = Math.round((this.subtotal + this.taxAmount) * 100) / 100;
   }
   next();
 });

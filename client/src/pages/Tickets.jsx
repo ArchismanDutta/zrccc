@@ -19,6 +19,8 @@ export default function TicketsPage() {
   const { toast } = useToast()
   const { user }  = useAuth()
   const isAdmin   = ['super_admin', 'admin'].includes(user?.role)
+  // project_manager and account_manager also have ticket create/assign/update permissions
+  const canManage = ['super_admin', 'admin', 'project_manager', 'account_manager'].includes(user?.role)
 
   const [tickets, setTickets]         = useState([])
   const [clients, setClients]         = useState([])
@@ -52,11 +54,11 @@ export default function TicketsPage() {
   useEffect(() => { fetchTickets() }, [filterStatus, filterPriority])
 
   useEffect(() => {
-    if (isAdmin) {
+    if (canManage) {
       api.getClients('?limit=200').then(r => setClients(r.data || [])).catch(() => {})
       api.getUsers('?limit=200').then(r => setUsers(r.data || [])).catch(() => {})
     }
-  }, [isAdmin])
+  }, [canManage])
 
   const openDetail = async (ticket) => {
     try {
@@ -69,7 +71,7 @@ export default function TicketsPage() {
 
   const submitCreate = async () => {
     if (!form.title || !form.description) { toast.error('Title and description required'); return }
-    if (isAdmin && !form.clientId) { toast.error('Select a client'); return }
+    if (canManage && !form.clientId) { toast.error('Select a client'); return }
     setSaving(true)
     try {
       await api.createTicket(form)
@@ -122,7 +124,7 @@ export default function TicketsPage() {
   return (
     <div className="space-y-4 animate-slide-up">
       <PageHeader title="Support Tickets" subtitle="Client support requests">
-        {isAdmin && (
+        {canManage && (
           <button className="btn btn-primary btn-sm gap-1" onClick={() => { setForm({ ...EMPTY_FORM }); setCreateOpen(true) }}>
             <Plus size={15} /> New Ticket
           </button>
@@ -184,7 +186,7 @@ export default function TicketsPage() {
         <Modal isOpen={detailOpen} onClose={() => setDetailOpen(false)} title={`${selected.ticketId} — ${selected.title}`} size="lg">
           <div className="space-y-4">
             {/* Controls (admin only) */}
-            {isAdmin && (
+            {canManage && (
               <div className="flex flex-wrap gap-3">
                 <div>
                   <label className="block text-[10px] text-fg-3 mb-1 uppercase tracking-wide">Status</label>
@@ -262,7 +264,7 @@ export default function TicketsPage() {
         <button className="btn btn-primary" onClick={submitCreate} disabled={saving}>{saving ? 'Creating…' : 'Create Ticket'}</button></>
       }>
         <div className="space-y-3">
-          {isAdmin && (
+          {canManage && (
             <div><label className="block text-xs font-medium text-fg-2 mb-1">Client *</label>
             <select className="input" value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))}>
               <option value="">Select client</option>

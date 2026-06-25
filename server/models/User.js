@@ -26,8 +26,19 @@ const userSchema = new mongoose.Schema({
   passwordResetToken:   { type: String, default: null },
   passwordResetExpires: { type: Date,   default: null },
 
-  // Refresh token rotation (hashed)
-  refreshTokenHash: { type: String, default: null, select: false },
+  // Per-device sessions (refresh token hashes + metadata)
+  sessions: {
+    type: [{
+      sessionId:        { type: String },
+      refreshTokenHash: { type: String },
+      ip:               { type: String, default: "" },
+      userAgent:        { type: String, default: "" },
+      createdAt:        { type: Date, default: Date.now },
+      lastUsedAt:       { type: Date, default: Date.now },
+    }],
+    default: [],
+    select: false,
+  },
 
   // Client portal link (only for role = "client")
   linkedClientId: { type: mongoose.Schema.Types.ObjectId, ref: "Client", default: null },
@@ -39,6 +50,17 @@ const userSchema = new mongoose.Schema({
   isActive:     { type: Boolean, default: true },
   lastLoginAt:  { type: Date, default: null },
 
+  // Brute-force protection
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockedUntil:         { type: Date,   default: null },
+
+  // Password history — last 5 hashes, never returned to clients
+  passwordHistory: {
+    type: [{ hash: { type: String }, changedAt: { type: Date } }],
+    default: [],
+    select: false,
+  },
+
   // Metadata
   createdBy:    { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 }, { timestamps: true });
@@ -47,9 +69,31 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ role: 1, isActive: 1 });
 userSchema.index({ departmentId: 1 });
 
-// Hash password before save
+// Hash password before save — also enforces password history (no reuse of last 5)
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
+
+  // Check new plaintext against stored history hashes
+  for (const entry of (this.passwordHistory || [])) {
+    const reused = await bcrypt.compare(this.password, entry.hash);
+    if (reused) {
+      const err = new Error("Cannot reuse one of your last 5 passwords");
+      err.statusCode = 400;
+      err.code = "VALIDATION_ERROR";
+      err.isOperational = true;
+      return next(err);
+    }
+  }
+
+  // Archive the old hash (passed by the controller via $locals before overwriting)
+  const oldHash = this.$locals.oldPasswordHash;
+  if (oldHash) {
+    this.passwordHistory = [
+      { hash: oldHash, changedAt: new Date() },
+      ...(this.passwordHistory || []),
+    ].slice(0, 5);
+  }
+
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });

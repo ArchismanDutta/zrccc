@@ -1,10 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Bell, Search, Sun, Moon, Palette, X, Check, Menu, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/Avatar'
 import { THEME_PRESETS, applyTheme, saveTheme, setDarkMode } from '@/lib/theme'
 import { useAuth } from '@/lib/auth'
+import api from '@/lib/api'
+import { getSocket } from '@/lib/socket'
+
+function relTime(d) {
+  const diff = Date.now() - new Date(d).getTime()
+  const m = Math.floor(diff / 60000), h = Math.floor(diff / 3600000), dy = Math.floor(diff / 86400000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  if (h < 24) return `${h}h ago`
+  return `${dy}d ago`
+}
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard', '/clients': 'Clients', '/projects': 'Projects',
@@ -18,6 +29,32 @@ export function TopBar({ sidebarCollapsed, isMobile, onMobileMenu, user, isDark,
   const [showThemePicker, setShowThemePicker] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    api.getNotifications().then(res => {
+      setNotifications(res.data?.notifications || [])
+      setUnreadCount(res.data?.unreadCount || 0)
+    }).catch(() => {})
+
+    const socket = getSocket()
+    socket.connect()
+    const onNotification = (notif) => {
+      setNotifications(prev => [notif, ...prev])
+      setUnreadCount(c => c + 1)
+    }
+    socket.on('notification', onNotification)
+    return () => { socket.off('notification', onNotification) }
+  }, [])
+
+  const handleMarkAllRead = async () => {
+    try {
+      await api.markAllRead()
+      setNotifications(n => n.map(x => ({ ...x, isRead: true })))
+      setUnreadCount(0)
+    } catch {}
+  }
 
   const pageTitle = Object.entries(PAGE_TITLES).find(([path]) =>
     location.pathname.startsWith(path)
@@ -106,7 +143,7 @@ export function TopBar({ sidebarCollapsed, isMobile, onMobileMenu, user, isDark,
       <div className="relative">
         <button className="btn btn-ghost btn-icon relative flex-shrink-0" onClick={() => setShowNotifications(s => !s)} title="Notifications">
           <Bell size={17} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--color-danger)] ring-2 ring-[var(--color-surface)]" />
+          {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--color-danger)] ring-2 ring-[var(--color-surface)]" />}
         </button>
         {showNotifications && (
           <>
@@ -114,19 +151,22 @@ export function TopBar({ sidebarCollapsed, isMobile, onMobileMenu, user, isDark,
             <div className="absolute right-0 top-full mt-2 z-50 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden" style={{ boxShadow: 'var(--shadow-lg)', width: 'min(320px, calc(100vw - 24px))' }}>
               <div className="flex items-center justify-between p-3 sm:p-4 border-b border-[var(--color-border)]">
                 <p className="font-semibold text-sm text-fg">Notifications</p>
-                <button className="text-xs text-accent font-medium hover:underline">Mark all read</button>
+                <button className="text-xs text-accent font-medium hover:underline" onClick={handleMarkAllRead}>Mark all read</button>
               </div>
               <div className="divide-y divide-[var(--color-border)] max-h-[60vh] overflow-y-auto">
-                {MOCK_NOTIFICATIONS.map(n => (
-                  <div key={n.id} className="flex gap-3 px-3 sm:px-4 py-3 hover:bg-[var(--color-surface-2)] transition-colors cursor-pointer">
-                    <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', n.read ? 'bg-transparent' : 'bg-accent')} />
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-fg">{n.title}</p>
-                      <p className="text-xs text-fg-3 mt-0.5">{n.body}</p>
-                      <p className="text-[10px] text-fg-3 mt-1">{n.time}</p>
+                {notifications.length === 0
+                  ? <p className="text-xs text-fg-3 text-center py-6">No notifications</p>
+                  : notifications.map(n => (
+                    <div key={n._id} className="flex gap-3 px-3 sm:px-4 py-3 hover:bg-[var(--color-surface-2)] transition-colors cursor-pointer">
+                      <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', n.isRead ? 'bg-transparent' : 'bg-accent')} />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-fg">{n.title}</p>
+                        <p className="text-xs text-fg-3 mt-0.5">{n.body}</p>
+                        <p className="text-[10px] text-fg-3 mt-1">{relTime(n.createdAt)}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                }
               </div>
               <div className="p-3 border-t border-[var(--color-border)]">
                 <button className="w-full text-center text-xs text-accent font-medium py-1 hover:underline">View all notifications</button>
@@ -169,10 +209,3 @@ export function TopBar({ sidebarCollapsed, isMobile, onMobileMenu, user, isDark,
     </header>
   )
 }
-
-const MOCK_NOTIFICATIONS = [
-  { id: 1, title: 'New client added', body: 'Nexus Tech was onboarded by Rahul', time: '2 min ago', read: false },
-  { id: 2, title: 'Content approved', body: 'Week 2 carousel approved by PM', time: '1h ago', read: false },
-  { id: 3, title: 'Invoice overdue', body: 'StyleHub invoice INV-2026-04 is 5 days overdue', time: '3h ago', read: false },
-  { id: 4, title: 'Task completed', body: 'Reel editing done — TechCorp June batch', time: '1d ago', read: true },
-]

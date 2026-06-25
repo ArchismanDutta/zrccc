@@ -23,7 +23,7 @@ export default function ClientsPage() {
   const [saving, setSaving] = useState(false)
 
   const fetchClients = async () => {
-    try { const res = await api.getClients('?limit=100'); setClients(res.data) }
+    try { const res = await api.getClients('?limit=100'); setClients(res.data || []) }
     catch { toast.error('Failed to load clients') }
     finally { setLoading(false) }
   }

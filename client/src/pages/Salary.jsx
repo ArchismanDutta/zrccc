@@ -105,7 +105,9 @@ function EmployeesTab() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    api.getHrEmployees().then(r => { setEmployees(r.data || []); setLoading(false) }).catch(() => setLoading(false))
+    api.getHrEmployees()
+      .then(r => { setEmployees(r.data || []); setLoading(false) })
+      .catch(err => { toast.error(err.message || 'Failed to load employees'); setLoading(false) })
   }, [])
 
   const startEdit = (emp) => { setEditSalaryId(emp._id); setSalaryInput(String(emp.salary || '')) }
@@ -182,7 +184,7 @@ function PayrollTab() {
   }
 
   useEffect(() => { fetchRecords() }, [month, year])
-  useEffect(() => { api.getHrEmployees().then(r => setEmployees(r.data || [])).catch(() => {}) }, [])
+  useEffect(() => { api.getHrEmployees().then(r => setEmployees(r.data || [])).catch(err => toast.error(err.message || 'Failed to load employees')) }, [])
 
   const generateRecord = async () => {
     if (!newForm.employeeId) { toast.error('Select an employee'); return }

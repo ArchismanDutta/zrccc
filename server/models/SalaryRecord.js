@@ -7,10 +7,10 @@ const salaryRecordSchema = new mongoose.Schema({
   employeeId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 
   month: { type: Number, required: true, min: 1, max: 12 },
-  year:  { type: Number, required: true },
+  year:  { type: Number, required: true, min: 2000, max: 2200 },
 
-  baseSalary:  { type: Number, required: true },
-  bonus:       { type: Number, default: 0 },
+  baseSalary:  { type: Number, required: true, min: [0, "baseSalary cannot be negative"] },
+  bonus:       { type: Number, default: 0, min: [0, "bonus cannot be negative"] },
   deductions: [{
     description: { type: String, required: true },
     amount:      { type: Number, required: true, min: 0 },

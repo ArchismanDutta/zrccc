@@ -31,7 +31,11 @@ exports.listMessages = async (req, res, next) => {
     }
 
     const filter = { channelId };
-    if (before) filter.createdAt = { $lt: new Date(before) };
+    if (before) {
+      const beforeDate = new Date(before);
+      if (isNaN(beforeDate.getTime())) throw new ValidationError("before must be a valid ISO date string");
+      filter.createdAt = { $lt: beforeDate };
+    }
 
     const messages = await Message.find(filter)
       .sort({ createdAt: -1 })
@@ -51,6 +55,7 @@ exports.sendMessage = async (req, res, next) => {
     const { channelId } = req.params;
     const { body } = req.body;
     if (!body?.trim()) throw new ValidationError("Message body is required");
+    if (body.length > 5000) throw new ValidationError("Message body must not exceed 5000 characters");
 
     const channel = await Channel.findById(channelId);
     if (!channel) throw new NotFoundError("Channel");
@@ -90,9 +95,22 @@ exports.getOrCreateProject = async (req, res, next) => {
     if (!projectId) throw new ValidationError("projectId is required");
     if (!name?.trim()) throw new ValidationError("name is required");
 
+    // Verify the caller has access to this project
+    const Project = require("../models/Project");
+    const project = await Project.findById(projectId).select("teamMembers projectManagerId clientId").lean();
+    if (!project) throw new NotFoundError("Project");
+
+    const role = req.user.role;
+    if (!["super_admin", "admin", "account_manager"].includes(role)) {
+      const isMember = project.teamMembers.some(m => String(m.userId) === String(req.user.id));
+      if (!isMember) throw new ForbiddenError("You are not a member of this project");
+    }
+
     let channel = await Channel.findOne({ type: "project", projectId });
     if (!channel) {
-      const allParticipants = [...new Set([String(req.user.id), ...participantIds.map(String)])];
+      // Derive participants from the project's team list — never trust client-supplied IDs.
+      const memberIds = project.teamMembers.map(m => String(m.userId));
+      const allParticipants = [...new Set([String(req.user.id), ...memberIds])];
       channel = await Channel.create({
         type: "project",
         projectId,
@@ -113,6 +131,7 @@ exports.getOrCreateDirect = async (req, res, next) => {
     const { userId } = req.body;
     if (!userId) throw new ValidationError("userId is required");
     if (String(userId) === String(req.user.id)) throw new ValidationError("Cannot DM yourself");
+    if (req.user.role === "client") throw new ForbiddenError("Clients must use the support ticket system");
 
     const other = await User.findById(userId).lean();
     if (!other) throw new NotFoundError("User");

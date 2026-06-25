@@ -64,8 +64,10 @@ function ProtectedRoutes() {
   const r = user?.role
   const isAdmin    = ['super_admin','admin'].includes(r)
   const isManager  = ['super_admin','admin','account_manager','project_manager'].includes(r)
-  const isFinance  = ['super_admin','admin'].includes(r)
+  // account_manager has invoices:create / payments:log — give them the Finance page
+  const isFinance  = ['super_admin','admin','account_manager'].includes(r)
   const isReporter = ['super_admin','admin','project_manager','account_manager'].includes(r)
+  // roles.js gives ticket permissions to project_manager and account_manager
   const canTickets = ['super_admin','admin','project_manager','account_manager'].includes(r)
 
   // All other roles → full admin CRM (filtered by role)

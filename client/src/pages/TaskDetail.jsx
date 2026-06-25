@@ -76,7 +76,7 @@ export default function TaskDetailPage() {
   const fetchTask = async () => {
     try {
       const res = await api.getTask(id)
-      setTask(res.data || res)
+      setTask(res.data)
     } catch (err) {
       toast.error('Failed to load task')
     } finally {

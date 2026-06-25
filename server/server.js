@@ -1,10 +1,11 @@
 // server.js — Entry point
-const http       = require("http");
-const { PORT }   = require("./config/env");
-const connectDB  = require("./config/db");
-const app        = require("./app");
-const User       = require("./models/User");
-const Channel    = require("./models/Channel");
+const http        = require("http");
+const cookieParse = require("cookie").parse;
+const { PORT }    = require("./config/env");
+const connectDB   = require("./config/db");
+const app         = require("./app");
+const User        = require("./models/User");
+const Channel     = require("./models/Channel");
 
 async function start() {
   try {
@@ -30,14 +31,11 @@ async function start() {
     // Socket.io auth middleware — reads JWT from cookie or auth handshake
     io.use(async (socket, next) => {
       try {
-        const token = socket.handshake.auth?.token ||
-          socket.handshake.headers?.cookie?.split(";")
-            .map(c => c.trim())
-            .find(c => c.startsWith("accessToken="))
-            ?.split("=")[1];
+        const cookies = cookieParse(socket.handshake.headers?.cookie || "");
+        const token = socket.handshake.auth?.token || cookies.accessToken;
         if (!token) return next(new Error("No token"));
 
-        const decoded = jwt.verify(token, JWT_ACCESS_SECRET);
+        const decoded = jwt.verify(token, JWT_ACCESS_SECRET, { algorithms: ["HS256"] });
 
         const user = await User.findById(decoded.id)
           .select("isActive tokenVersion")
@@ -75,6 +73,7 @@ async function start() {
       socket.on("message:send", async ({ channelId, body }) => {
         try {
           if (!body?.trim()) return;
+          if (body.length > 5000) return;
           const channel = await Channel.findById(channelId);
           if (!channel) return;
           if (!channel.participants.some(p => String(p) === socket.userId)) return;
@@ -97,8 +96,13 @@ async function start() {
         } catch (_) {}
       });
 
-      socket.on("message:typing", ({ channelId }) => {
-        socket.to(channelId).emit("message:typing", { channelId, userId: socket.userId });
+      socket.on("message:typing", async ({ channelId }) => {
+        try {
+          const channel = await Channel.findById(channelId).select("participants").lean();
+          if (!channel) return;
+          if (!channel.participants.some(p => String(p) === socket.userId)) return;
+          socket.to(channelId).emit("message:typing", { channelId, userId: socket.userId });
+        } catch (_) {}
       });
     });
 
@@ -122,5 +126,15 @@ async function start() {
     process.exit(1);
   }
 }
+
+// Catch anything that escapes the Express error handler
+process.on("unhandledRejection", (reason) => {
+  console.error("💥 Unhandled rejection:", reason);
+  process.exit(1);
+});
+process.on("uncaughtException", (err) => {
+  console.error("💥 Uncaught exception:", err);
+  process.exit(1);
+});
 
 start();

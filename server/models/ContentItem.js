@@ -1,11 +1,13 @@
 // models/ContentItem.js
 const mongoose = require("mongoose");
 
+const ATTACHMENT_URL = { type: String, match: [/^https?:\/\//, "Attachment URL must start with http:// or https://"] };
+
 const revisionSchema = new mongoose.Schema({
   feedback:  { type: String, required: true },
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   reviewedAt: { type: Date, default: Date.now },
-  attachments: [{ url: String, name: String, type: String }],
+  attachments: [{ url: ATTACHMENT_URL, name: String, type: String }],
 }, { _id: true });
 
 const contentItemSchema = new mongoose.Schema({
@@ -43,7 +45,7 @@ const contentItemSchema = new mongoose.Schema({
   adDetails: {
     adObjective:    { type: String, default: "" },
     targetAudience: { type: String, default: "" },
-    budget:         { type: Number, default: 0 },
+    budget:         { type: Number, default: 0, min: [0, "Ad budget cannot be negative"] },
     adSetName:      { type: String, default: "" },
     campaignName:   { type: String, default: "" },
   },
@@ -78,7 +80,7 @@ const contentItemSchema = new mongoose.Schema({
 
   // Calendar placement
   plannedMonth: { type: String },   // YYYY-MM
-  weekNumber:   { type: Number },   // 1–5
+  weekNumber:   { type: Number, min: [1, "weekNumber must be 1–5"], max: [5, "weekNumber must be 1–5"] },   // 1–5
   dayOfWeek:    { type: String },
   postingTime:  { type: String },
 

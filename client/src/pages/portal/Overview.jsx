@@ -34,7 +34,7 @@ export default function PortalOverview() {
   )
 
   const activeProjects = projects.filter(p => p.status === 'active')
-  const pendingApprovals = content.filter(c => c.status === 'in_review')
+  const pendingApprovals = content.filter(c => c.status === 'awaiting_client')
   const unpaidInvoices = invoices.filter(i => ['sent', 'partial', 'overdue'].includes(i.status))
   const totalOutstanding = unpaidInvoices.reduce((s, i) => s + ((i.totalAmount || 0) - (i.paidAmount || 0)), 0)
 

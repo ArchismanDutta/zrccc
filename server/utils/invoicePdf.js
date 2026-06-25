@@ -21,9 +21,10 @@ function generateInvoicePdf(invoice, res) {
   const doc = new PDFDocument({ size: "A4", margin: 50, bufferPages: true });
 
   // ── Stream straight to response ──────────────────────────
-  const fileName = `${invoice.invoiceNumber || invoice.invoiceId || "invoice"}.pdf`;
+  const rawName = invoice.invoiceNumber || invoice.invoiceId || "invoice";
+  const safeFileName = String(rawName).replace(/[^\w\-]/g, "_") + ".pdf";
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${safeFileName}"`);
   doc.pipe(res);
 
   // ── Colours ──────────────────────────────────────────────

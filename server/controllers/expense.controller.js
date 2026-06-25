@@ -1,8 +1,11 @@
 // controllers/expense.controller.js
 const Expense = require("../models/Expense");
 const { success, created, paginated } = require("../utils/response");
-const { ValidationError, NotFoundError } = require("../utils/errors");
+const { ValidationError, NotFoundError, ForbiddenError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
+const { sanitizeSort, parsePagination } = require("../utils/sanitize");
+
+const EXPENSE_SORTS = ["-date", "date", "-amount", "amount", "-createdAt", "createdAt"];
 
 // POST /api/expenses
 exports.createExpense = async (req, res, next) => {
@@ -37,8 +40,14 @@ exports.createExpense = async (req, res, next) => {
 // GET /api/expenses
 exports.listExpenses = async (req, res, next) => {
   try {
-    const { page = 1, limit = 50, category, month, year, sort = "-date" } = req.query;
+    const { page = 1, limit = 50, category, month, year } = req.query;
+    const sort = sanitizeSort(req.query.sort, EXPENSE_SORTS, "-date");
     const filter = {};
+
+    // Non-admin users see only expenses they filed
+    if (!["super_admin", "admin"].includes(req.user.role)) {
+      filter.createdBy = req.user.id;
+    }
 
     if (category) filter.category = category;
 
@@ -53,24 +62,30 @@ exports.listExpenses = async (req, res, next) => {
       filter.date = { $gte: startDate, $lte: endDate };
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { page: safePage, limit: safeLimit, skip } = parsePagination(page, limit, 50);
     const [docs, total] = await Promise.all([
       Expense.find(filter)
         .populate("paidBy", "name")
         .populate("createdBy", "name")
-        .sort(sort).skip(skip).limit(parseInt(limit)).lean(),
+        .sort(sort).skip(skip).limit(safeLimit).lean(),
       Expense.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: parseInt(limit) });
+    paginated(res, { docs, total, page: safePage, limit: safeLimit });
   } catch (err) { next(err); }
 };
+
+function _requireExpenseOwner(expense, user) {
+  if (["super_admin", "admin"].includes(user.role)) return;
+  if (String(expense.createdBy) !== String(user.id)) throw new ForbiddenError("You can only modify your own expenses");
+}
 
 // PATCH /api/expenses/:id
 exports.updateExpense = async (req, res, next) => {
   try {
     const expense = await Expense.findById(req.params.id);
     if (!expense) throw new NotFoundError("Expense");
+    _requireExpenseOwner(expense, req.user);
 
     const allowed = ["category", "description", "amount", "date", "vendor", "recurring", "paidBy", "notes"];
     for (const key of allowed) {
@@ -92,6 +107,7 @@ exports.deleteExpense = async (req, res, next) => {
   try {
     const expense = await Expense.findById(req.params.id);
     if (!expense) throw new NotFoundError("Expense");
+    _requireExpenseOwner(expense, req.user);
 
     await Expense.findByIdAndDelete(req.params.id);
 

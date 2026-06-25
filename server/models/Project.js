@@ -56,7 +56,7 @@ const projectSchema = new mongoose.Schema({
 
   overallProgress: { type: Number, min: 0, max: 100, default: 0 },
 
-  budget:   { type: Number, default: 0 },
+  budget:   { type: Number, default: 0, min: [0, "Budget cannot be negative"] },
   currency: { type: String, enum: ["INR", "USD", "AED", "GBP"], default: "INR" },
 
   statusHistory: [statusChangeSchema],

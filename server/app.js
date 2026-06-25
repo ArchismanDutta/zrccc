@@ -64,16 +64,29 @@ app.use(
 );
 
 // ── Body Parsing ──────────────────────────────────────────────
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(cookieParser());
 
 // ── NoSQL Injection Prevention ────────────────────────────────
 app.use(mongoSanitize());
 
+// ── HTTP Parameter Pollution Prevention ───────────────────────
+// Express parses ?foo=a&foo=b into req.query.foo = ["a","b"].
+// Passing an array straight to a Mongoose filter uses implicit $in,
+// which can expose more rows than intended. Collapse to first value globally.
+app.use((req, _res, next) => {
+  for (const key of Object.keys(req.query)) {
+    if (Array.isArray(req.query[key])) {
+      req.query[key] = req.query[key][0];
+    }
+  }
+  next();
+});
+
 // ── Health Check ──────────────────────────────────────────────
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", version: "1.0.0", timestamp: new Date().toISOString() });
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // ── Rate Limit ────────────────────────────────────────────────
@@ -104,6 +117,23 @@ app.use((req, _res, next) => {
 // ── Global Error Handler ──────────────────────────────────────
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
+  // Mongoose CastError (invalid ObjectId in a route param / query)
+  if (err.name === "CastError") {
+    return sendError(res, { code: "VALIDATION_ERROR", message: "Invalid ID format", statusCode: 400 }, 400);
+  }
+
+  // Mongoose schema validation error
+  if (err.name === "ValidationError" && err.errors) {
+    const message = Object.values(err.errors).map(e => e.message).join("; ");
+    return sendError(res, { code: "VALIDATION_ERROR", message, statusCode: 400 }, 400);
+  }
+
+  // MongoDB duplicate-key (E11000)
+  if (err.code === 11000) {
+    const field = Object.keys(err.keyValue || {})[0] || "field";
+    return sendError(res, { code: "CONFLICT", message: `${field} already exists`, statusCode: 409 }, 409);
+  }
+
   if (!err.isOperational) {
     console.error("💥 Unexpected error:", err);
   }

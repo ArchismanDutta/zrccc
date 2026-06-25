@@ -6,16 +6,34 @@ const SalaryRecord = require("../models/SalaryRecord");
 const { success, created, paginated } = require("../utils/response");
 const { ValidationError, NotFoundError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
+const { sanitizeSort, parsePagination } = require("../utils/sanitize");
+
+const SALARY_SORTS           = ["-year -month", "year -month", "-year", "year"];
+const SALARY_STATUSES        = ["pending", "paid"];
+const SALARY_PAYMENT_METHODS = ["bank_transfer", "upi", "cash", "cheque"];
 
 // GET /api/hr/employees — list all non-client employees
 exports.getEmployees = async (req, res, next) => {
   try {
-    const employees = await User.find({ role: { $ne: "client" }, isActive: true })
-      .select("name email role departmentId salary isActive avatar userId")
-      .populate("departmentId", "displayName slug")
-      .sort("name")
-      .lean();
-    success(res, employees);
+    const { page = 1, limit = 50, search } = req.query;
+    const filter = { role: { $ne: "client" }, isActive: true };
+    if (search) {
+      const { escapeRegex } = require("../utils/sanitize");
+      const s = escapeRegex(search);
+      filter.$or = [
+        { name: { $regex: s, $options: "i" } },
+        { email: { $regex: s, $options: "i" } },
+      ];
+    }
+    const { page: safePage, limit: safeLimit, skip } = parsePagination(page, limit, 50);
+    const [docs, total] = await Promise.all([
+      User.find(filter)
+        .select("name email role departmentId salary isActive avatar userId")
+        .populate("departmentId", "displayName slug")
+        .sort("name").skip(skip).limit(safeLimit).lean(),
+      User.countDocuments(filter),
+    ]);
+    paginated(res, { docs, total, page: safePage, limit: safeLimit });
   } catch (err) { next(err); }
 };
 
@@ -23,7 +41,7 @@ exports.getEmployees = async (req, res, next) => {
 exports.updateEmployeeSalary = async (req, res, next) => {
   try {
     const { salary } = req.body;
-    if (salary == null || salary < 0) throw new ValidationError("salary must be a non-negative number");
+    if (salary == null || typeof salary !== "number" || salary < 0) throw new ValidationError("salary must be a non-negative number");
 
     const user = await User.findById(req.params.id);
     if (!user) throw new NotFoundError("Employee");
@@ -47,6 +65,11 @@ exports.createSalaryRecord = async (req, res, next) => {
     if (!employeeId || !month || !year) {
       throw new ValidationError("employeeId, month, and year are required");
     }
+    const m = parseInt(month);
+    const y = parseInt(year);
+    if (isNaN(m) || m < 1 || m > 12) throw new ValidationError("month must be between 1 and 12");
+    if (isNaN(y) || y < 2000 || y > 2200) throw new ValidationError("year must be between 2000 and 2200");
+    if (bonus != null && (isNaN(Number(bonus)) || Number(bonus) < 0)) throw new ValidationError("bonus must be a non-negative number");
 
     const employee = await User.findById(employeeId);
     if (!employee) throw new NotFoundError("Employee");
@@ -82,16 +105,19 @@ exports.createSalaryRecord = async (req, res, next) => {
 // GET /api/hr/salaries — list salary records
 exports.listSalaryRecords = async (req, res, next) => {
   try {
-    const { page = 1, limit = 50, employeeId, month, year, status, sort = "-year -month" } = req.query;
+    const { page = 1, limit = 50, employeeId, month, year, status } = req.query;
+    const sort = sanitizeSort(req.query.sort, SALARY_SORTS, "-year -month");
     const filter = {};
 
     if (employeeId) filter.employeeId = employeeId;
     if (month) filter.month = parseInt(month);
     if (year) filter.year = parseInt(year);
-    if (status) filter.status = status;
+    if (status) {
+      if (!SALARY_STATUSES.includes(status)) throw new ValidationError(`Invalid status. Allowed: ${SALARY_STATUSES.join(", ")}`);
+      filter.status = status;
+    }
 
-    const safeLimit = Math.min(parseInt(limit) || 20, 200);
-    const skip = (parseInt(page) - 1) * safeLimit;
+    const { page: safePage, limit: safeLimit, skip } = parsePagination(page, limit, 20);
     const [docs, total] = await Promise.all([
       SalaryRecord.find(filter)
         .populate("employeeId", "name email role departmentId avatar salary")
@@ -100,7 +126,7 @@ exports.listSalaryRecords = async (req, res, next) => {
       SalaryRecord.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
+    paginated(res, { docs, total, page: safePage, limit: safeLimit });
   } catch (err) { next(err); }
 };
 
@@ -111,10 +137,15 @@ exports.markSalaryPaid = async (req, res, next) => {
     if (!record) throw new NotFoundError("Salary Record");
     if (record.status === "paid") throw new ValidationError("Salary already marked as paid");
 
+    const paymentMethod = req.body.paymentMethod || "bank_transfer";
+    if (!SALARY_PAYMENT_METHODS.includes(paymentMethod)) {
+      throw new ValidationError(`Invalid paymentMethod. Allowed: ${SALARY_PAYMENT_METHODS.join(", ")}`);
+    }
+
     record.status = "paid";
     record.paidDate = new Date();
     record.paidBy = req.user.id;
-    record.paymentMethod = req.body.paymentMethod || "bank_transfer";
+    record.paymentMethod = paymentMethod;
     record.transactionRef = req.body.transactionRef || "";
 
     // ── Generate PDF payslip ─────────────────────────────────
@@ -229,7 +260,9 @@ exports.downloadPayslip = async (req, res, next) => {
     if (!record) throw new NotFoundError("Salary Record");
     if (!record.payslipUrl) throw new NotFoundError("Payslip not generated yet");
 
-    const filePath = path.join(__dirname, "..", record.payslipUrl);
+    const allowedDir = path.resolve(__dirname, "..", "uploads", "payslips");
+    const filePath   = path.resolve(__dirname, "..", record.payslipUrl);
+    if (!filePath.startsWith(allowedDir + path.sep)) throw new NotFoundError("Payslip file not found");
     if (!fs.existsSync(filePath)) throw new NotFoundError("Payslip file not found");
 
     res.download(filePath, `Payslip-${record.salaryId}.pdf`);

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import api from './api'
+import { disconnectSocket } from './socket'
 
 const AuthContext = createContext(null)
 
@@ -22,6 +23,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     try { await api.logout() } catch (_) {}
+    disconnectSocket()
     setUser(null)
   }, [])
 

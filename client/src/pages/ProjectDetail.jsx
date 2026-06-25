@@ -98,7 +98,15 @@ function TaskCard({ task, onMove }) {
 
 function StatusSelect({ status, onChangeStatus }) {
   const [open, setOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [showReason, setShowReason] = useState(false)
   const statuses = ['planning', 'active', 'on_hold', 'completed', 'cancelled']
+
+  const handleSelect = (s) => {
+    if (s === 'cancelled') { setShowReason(true); setOpen(false) }
+    else { onChangeStatus(s); setOpen(false) }
+  }
+
   return (
     <div className="relative">
       <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1">
@@ -108,11 +116,26 @@ function StatusSelect({ status, onChangeStatus }) {
       {open && (
         <div className="absolute left-0 top-full mt-1 z-20 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-lg py-1 min-w-[140px]">
           {statuses.map(s => (
-            <button key={s} onClick={() => { onChangeStatus(s); setOpen(false) }}
+            <button key={s} onClick={() => handleSelect(s)}
               className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--color-surface-3)] transition-colors ${s === status ? 'text-accent font-semibold' : 'text-fg-2'}`}>
               {s.replace(/_/g, ' ')}
             </button>
           ))}
+        </div>
+      )}
+      {showReason && (
+        <div className="absolute left-0 top-full mt-1 z-20 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-lg p-3 w-64">
+          <p className="text-xs font-semibold text-fg mb-2">Reason for cancellation</p>
+          <textarea className="input resize-none text-xs w-full" rows={2} placeholder="e.g. client withdrew budget…"
+            value={cancelReason} onChange={e => setCancelReason(e.target.value)} />
+          <div className="flex gap-2 mt-2">
+            <button className="btn btn-ghost btn-sm text-xs flex-1" onClick={() => { setShowReason(false); setCancelReason('') }}>Cancel</button>
+            <button className="btn btn-sm text-xs flex-1" style={{ background: 'var(--color-danger)', color: '#fff' }}
+              disabled={!cancelReason.trim()}
+              onClick={() => { onChangeStatus('cancelled', cancelReason.trim()); setShowReason(false); setCancelReason('') }}>
+              Confirm
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -178,17 +201,22 @@ export default function ProjectDetailPage() {
   }
 
   const fetchTasks = async () => {
-    const res = await api.getTasks(`?projectId=${id}&limit=100`)
-    setTasks(res.data)
+    try {
+      const res = await api.getTasks(`?projectId=${id}&limit=100`)
+      setTasks(res.data || [])
+    } catch { /* tasks may be empty or access-restricted for some roles */ }
   }
 
   const fetchContent = async () => {
-    const res = await api.getContent(`?projectId=${id}&limit=100`)
-    setContent(res.data)
+    try {
+      const res = await api.getContent(`?projectId=${id}&limit=100`)
+      setContent(res.data || [])
+    } catch { /* content may be empty or access-restricted for some roles */ }
   }
 
   useEffect(() => {
-    Promise.all([fetchProject(), fetchTasks(), fetchContent()])
+    fetchProject()
+      .then(() => Promise.all([fetchTasks(), fetchContent()]))
       .catch(() => { toast.error('Project not found'); navigate('/projects') })
       .finally(() => setLoading(false))
   }, [id])
@@ -197,7 +225,7 @@ export default function ProjectDetailPage() {
     setTeamForm({ userId: '', projectRole: '' })
     setTeamModalOpen(true)
     if (!allUsers.length) {
-      try { const res = await api.getUsers('?limit=100'); setAllUsers(res.data) } catch {}
+      try { const res = await api.getUsers('?limit=100'); setAllUsers(res.data || []) } catch {}
     }
   }
 
@@ -244,7 +272,7 @@ export default function ProjectDetailPage() {
   const openEdit = async () => {
     // Ensure users are loaded
     if (!allUsers.length) {
-      try { const res = await api.getUsers('?limit=100'); setAllUsers(res.data) } catch {}
+      try { const res = await api.getUsers('?limit=100'); setAllUsers(res.data || []) } catch {}
     }
     const currentMemberIds = (project.teamMembers || [])
       .map(m => String(m.userId?._id || m.userId))
@@ -289,9 +317,9 @@ export default function ProjectDetailPage() {
     finally { setSaving(false) }
   }
 
-  const changeStatus = async (status) => {
+  const changeStatus = async (status, reason) => {
     try {
-      await api.changeProjectStatus(id, { status })
+      await api.changeProjectStatus(id, { status, ...(reason ? { reason } : {}) })
       toast.success(`Status → ${status.replace(/_/g, ' ')}`)
       fetchProject()
     } catch (err) { toast.error(err.message) }
@@ -463,14 +491,14 @@ export default function ProjectDetailPage() {
                   <div key={m._id} className="flex items-center gap-3 py-1">
                     <button
                       onClick={() => handleToggleMilestone(m._id)}
-                      className={`w-4 h-4 rounded-full flex-shrink-0 border-2 flex items-center justify-center transition-colors ${m.completed ? 'bg-[var(--color-success)] border-[var(--color-success)]' : 'border-[var(--color-border)] hover:border-accent'}`}>
-                      {m.completed && <Check size={9} color="white" strokeWidth={3} />}
+                      className={`w-4 h-4 rounded-full flex-shrink-0 border-2 flex items-center justify-center transition-colors ${m.isCompleted ? 'bg-[var(--color-success)] border-[var(--color-success)]' : 'border-[var(--color-border)] hover:border-accent'}`}>
+                      {m.isCompleted && <Check size={9} color="white" strokeWidth={3} />}
                     </button>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${m.completed ? 'line-through text-fg-3' : 'text-fg'}`}>{m.title}</p>
+                      <p className={`text-sm font-medium ${m.isCompleted ? 'line-through text-fg-3' : 'text-fg'}`}>{m.title}</p>
                       {m.dueDate && <p className="text-xs text-fg-3">{formatDate(m.dueDate, { year: undefined })}</p>}
                     </div>
-                    {m.completed && <Badge variant="success" className="text-[10px]">Done</Badge>}
+                    {m.isCompleted && <Badge variant="success" className="text-[10px]">Done</Badge>}
                   </div>
                 ))}
               </div>

@@ -1,5 +1,6 @@
 // seeds/bootstrap.js
 // Auto-seed roles, departments, and default super_admin on first boot.
+const crypto     = require("crypto");
 const Role       = require("../models/Role");
 const Department = require("../models/Department");
 const User       = require("../models/User");
@@ -56,17 +57,35 @@ async function bootstrap() {
   // Seed default super_admin if no users exist
   const userCount = await User.countDocuments();
   if (userCount === 0) {
+    // Use env-provided credentials when available; fall back to a one-time random password.
+    const adminEmail    = process.env.BOOTSTRAP_ADMIN_EMAIL    || "admin@zrcmedia.in";
+    const adminName     = process.env.BOOTSTRAP_ADMIN_NAME     || "ZRC Admin";
+    // Generate a strong random password: 16 url-safe chars + guaranteed digit + special char
+    const randomSuffix  = crypto.randomBytes(12).toString("base64url"); // ~16 chars, url-safe
+    const defaultPass   = process.env.BOOTSTRAP_ADMIN_PASSWORD || `${randomSuffix}@1`;
+
     const seq = await nextSequence("user");
     const admin = await User.create({
       userId: `ZRC-USR-${String(seq).padStart(5, "0")}`,
-      name: "Archis Dutta",
-      email: "admin@zrcmedia.in",
-      password: "admin123",   // Change this immediately!
+      name: adminName,
+      email: adminEmail,
+      password: defaultPass,
       role: "super_admin",
       roleLevel: 10,
       isActive: true,
     });
-    console.log(`✅ Default super_admin created: ${admin.email} (password: admin123)`);
+
+    if (!process.env.BOOTSTRAP_ADMIN_PASSWORD) {
+      // Only print the generated password once — it cannot be recovered after this point.
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log(`✅ Default super_admin created`);
+      console.log(`   Email   : ${admin.email}`);
+      console.log(`   Password: ${defaultPass}`);
+      console.log("   ⚠️  Change this password immediately after first login!");
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    } else {
+      console.log(`✅ Default super_admin created: ${admin.email}`);
+    }
   }
 }
 

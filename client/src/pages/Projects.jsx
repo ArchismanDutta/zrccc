@@ -64,7 +64,7 @@ export default function ProjectsPage() {
   }
 
   const fetchProjects = async () => {
-    try { const res = await api.getProjects('?limit=100'); setProjects(res.data) }
+    try { const res = await api.getProjects('?limit=100'); setProjects(res.data || []) }
     catch { toast.error('Failed to load projects') } finally { setLoading(false) }
   }
   useEffect(() => { fetchProjects() }, [])

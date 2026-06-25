@@ -1,6 +1,12 @@
 // controllers/project.controller.js
 const Project = require("../models/Project");
+const Client  = require("../models/Client");
+const User    = require("../models/User");
 const { nextSequence } = require("../models/Counter");
+const { escapeRegex, sanitizeSort, parsePagination } = require("../utils/sanitize");
+
+const PROJECT_SORTS = ["-createdAt", "createdAt", "name", "-name", "-updatedAt", "updatedAt"];
+const PROJECT_STATUSES = ["planning", "active", "on_hold", "completed", "cancelled"];
 const { success, created, paginated } = require("../utils/response");
 const { ValidationError, NotFoundError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
@@ -17,6 +23,13 @@ exports.createProject = async (req, res, next) => {
     if (!name || !clientId || !projectManagerId) {
       throw new ValidationError("name, clientId, and projectManagerId are required");
     }
+
+    const [clientExists, pmExists] = await Promise.all([
+      Client.exists({ _id: clientId, isArchived: false }),
+      User.exists({ _id: projectManagerId, isActive: true }),
+    ]);
+    if (!clientExists) throw new ValidationError("Client not found");
+    if (!pmExists) throw new ValidationError("Project manager not found");
 
     const seq = await nextSequence("project");
     const projectId = `ZRC-PRJ-${String(seq).padStart(5, "0")}`;
@@ -40,10 +53,14 @@ exports.createProject = async (req, res, next) => {
 
 exports.listProjects = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, status, clientId, search, sort = "-createdAt" } = req.query;
+    const { page = 1, limit = 20, status, clientId, search } = req.query;
+    const sort = sanitizeSort(req.query.sort, PROJECT_SORTS, "-createdAt");
     const filter = { isArchived: false };
 
-    if (status) filter.status = status;
+    if (status) {
+      if (!PROJECT_STATUSES.includes(status)) throw new ValidationError(`Invalid status. Allowed: ${PROJECT_STATUSES.join(", ")}`);
+      filter.status = status;
+    }
     if (clientId) filter.clientId = clientId;
 
     // Role scoping
@@ -55,14 +72,14 @@ exports.listProjects = async (req, res, next) => {
     }
 
     if (search) {
+      const s = escapeRegex(search);
       filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { projectId: { $regex: search, $options: "i" } },
+        { name: { $regex: s, $options: "i" } },
+        { projectId: { $regex: s, $options: "i" } },
       ];
     }
 
-    const safeLimit = Math.min(parseInt(limit) || 20, 200);
-    const skip = (parseInt(page) - 1) * safeLimit;
+    const { page: safePage, limit: safeLimit, skip } = parsePagination(page, limit, 20);
     const [docs, total] = await Promise.all([
       Project.find(filter)
         .populate("clientId", "companyName displayName")
@@ -72,7 +89,7 @@ exports.listProjects = async (req, res, next) => {
       Project.countDocuments(filter),
     ]);
 
-    paginated(res, { docs, total, page: parseInt(page), limit: safeLimit });
+    paginated(res, { docs, total, page: safePage, limit: safeLimit });
   } catch (err) { next(err); }
 };
 
@@ -112,13 +129,16 @@ exports.updateProject = async (req, res, next) => {
     // Capture old PM before any field updates
     const oldPmId = project.projectManagerId ? String(project.projectManagerId) : null;
 
-    const allowed = ["name", "description", "type", "priority", "startDate", "endDate", "budget", "currency", "tags", "overallProgress", "projectManagerId"];
+    // All team members may update descriptive fields; financial/management fields are admin/PM-only
+    const isManager = ["super_admin", "admin", "project_manager"].includes(role);
+    const allowed = ["name", "description", "type", "priority", "startDate", "endDate", "tags", "overallProgress"];
+    if (isManager) allowed.push("budget", "currency", "projectManagerId");
     for (const key of allowed) {
       if (req.body[key] !== undefined) project[key] = req.body[key];
     }
 
-    // When PM changes, swap the teamMembers entry
-    if (req.body.projectManagerId) {
+    // When PM changes, swap the teamMembers entry (only reachable for managers)
+    if (isManager && req.body.projectManagerId) {
       const newPmId = String(req.body.projectManagerId);
 
       // Remove old PM from teamMembers
@@ -143,8 +163,14 @@ exports.changeStatus = async (req, res, next) => {
   try {
     const { status, reason } = req.body;
     if (!status) throw new ValidationError("status is required");
+    if (!PROJECT_STATUSES.includes(status)) throw new ValidationError(`Invalid status. Allowed: ${PROJECT_STATUSES.join(", ")}`);
     const project = await Project.findById(req.params.id);
     if (!project) throw new NotFoundError("Project");
+
+    if (TEAM_SCOPED_ROLES.includes(req.user.role)) {
+      const isMember = project.teamMembers.some(m => String(m.userId) === String(req.user.id));
+      if (!isMember) throw new NotFoundError("Project");
+    }
 
     if (status === "cancelled" && !reason) throw new ValidationError("Cancel reason required");
 
@@ -165,6 +191,15 @@ exports.addTeamMember = async (req, res, next) => {
     const project = await Project.findById(req.params.id);
     if (!project) throw new NotFoundError("Project");
 
+    // Project managers may only manage their own projects
+    if (req.user.role === "project_manager" &&
+        String(project.projectManagerId) !== String(req.user.id)) {
+      throw new NotFoundError("Project");
+    }
+
+    const userExists = await User.exists({ _id: userId, isActive: true });
+    if (!userExists) throw new ValidationError("User not found");
+
     const alreadyMember = project.teamMembers.some(m => m.userId.toString() === userId);
     if (alreadyMember) throw new ValidationError("User is already a team member");
 
@@ -178,6 +213,16 @@ exports.removeTeamMember = async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) throw new NotFoundError("Project");
+
+    // Project managers may only manage their own projects
+    if (req.user.role === "project_manager" &&
+        String(project.projectManagerId) !== String(req.user.id)) {
+      throw new NotFoundError("Project");
+    }
+
+    if (String(project.projectManagerId) === req.params.userId) {
+      throw new ValidationError("Cannot remove the project manager from the team");
+    }
 
     project.teamMembers = project.teamMembers.filter(m => m.userId.toString() !== req.params.userId);
     await project.save();
@@ -202,6 +247,11 @@ exports.addMilestone = async (req, res, next) => {
     if (!title) throw new ValidationError("title is required");
     const project = await Project.findById(req.params.id);
     if (!project) throw new NotFoundError("Project");
+
+    if (TEAM_SCOPED_ROLES.includes(req.user.role)) {
+      const isMember = project.teamMembers.some(m => String(m.userId) === String(req.user.id));
+      if (!isMember) throw new NotFoundError("Project");
+    }
     project.milestones.push({ title, dueDate: dueDate || null });
     await project.save();
     success(res, project);
@@ -212,6 +262,11 @@ exports.toggleMilestone = async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) throw new NotFoundError("Project");
+
+    if (TEAM_SCOPED_ROLES.includes(req.user.role)) {
+      const isMember = project.teamMembers.some(m => String(m.userId) === String(req.user.id));
+      if (!isMember) throw new NotFoundError("Project");
+    }
     const milestone = project.milestones.id(req.params.milestoneId);
     if (!milestone) throw new NotFoundError("Milestone");
     milestone.isCompleted = !milestone.isCompleted;

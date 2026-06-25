@@ -28,7 +28,15 @@ function InfoRow({ label, value, mono }) {
 
 function StatusChip({ status, onChangeStatus }) {
   const [open, setOpen] = useState(false)
+  const [churnReason, setChurnReason] = useState('')
+  const [showReason, setShowReason] = useState(false)
   const statuses = ['prospect', 'onboarding', 'active', 'paused', 'churned', 'reactivated']
+
+  const handleSelect = (s) => {
+    if (s === 'churned') { setShowReason(true); setOpen(false) }
+    else { onChangeStatus(s); setOpen(false) }
+  }
+
   return (
     <div className="relative">
       <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1">
@@ -38,11 +46,26 @@ function StatusChip({ status, onChangeStatus }) {
       {open && (
         <div className="absolute left-0 top-full mt-1 z-20 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-lg py-1 min-w-[140px]">
           {statuses.map(s => (
-            <button key={s} onClick={() => { onChangeStatus(s); setOpen(false) }}
+            <button key={s} onClick={() => handleSelect(s)}
               className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--color-surface-3)] transition-colors ${s === status ? 'text-accent font-semibold' : 'text-fg-2'}`}>
               {s.replace(/_/g, ' ')}
             </button>
           ))}
+        </div>
+      )}
+      {showReason && (
+        <div className="absolute left-0 top-full mt-1 z-20 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-lg p-3 w-64">
+          <p className="text-xs font-semibold text-fg mb-2">Reason for churning</p>
+          <textarea className="input resize-none text-xs w-full" rows={2} placeholder="e.g. budget cut, competitor…"
+            value={churnReason} onChange={e => setChurnReason(e.target.value)} />
+          <div className="flex gap-2 mt-2">
+            <button className="btn btn-ghost btn-sm text-xs flex-1" onClick={() => { setShowReason(false); setChurnReason('') }}>Cancel</button>
+            <button className="btn btn-sm text-xs flex-1" style={{ background: 'var(--color-danger)', color: '#fff' }}
+              disabled={!churnReason.trim()}
+              onClick={() => { onChangeStatus('churned', churnReason.trim()); setShowReason(false); setChurnReason('') }}>
+              Confirm
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -68,12 +91,12 @@ export default function ClientDetailPage() {
   }
 
   const fetchProjects = async () => {
-    try { const res = await api.getProjects(`?clientId=${id}&limit=50`); setProjects(res.data) }
+    try { const res = await api.getProjects(`?clientId=${id}&limit=50`); setProjects(res.data || []) }
     catch {}
   }
 
   const fetchInvoices = async () => {
-    try { const res = await api.getInvoices(`?clientId=${id}&limit=50`); setInvoices(res.data) }
+    try { const res = await api.getInvoices(`?clientId=${id}&limit=50`); setInvoices(res.data || []) }
     catch {}
   }
 
@@ -115,9 +138,9 @@ export default function ClientDetailPage() {
     finally { setSaving(false) }
   }
 
-  const changeStatus = async (status) => {
+  const changeStatus = async (status, reason) => {
     try {
-      await api.changeClientStatus(id, { status })
+      await api.changeClientStatus(id, { status, ...(reason ? { reason } : {}) })
       toast.success(`Status changed to ${status}`)
       fetchClient()
     } catch (err) { toast.error(err.message) }

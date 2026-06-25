@@ -6,12 +6,15 @@ import { useToast } from '@/components/ui/Toast'
 import api from '@/lib/api'
 
 const STATUS_TABS = [
-  { id: 'all',             label: 'All' },
-  { id: 'in_review',       label: 'Needs Approval' },
-  { id: 'approved',        label: 'Approved' },
-  { id: 'revision_needed', label: 'Revision' },
-  { id: 'published',       label: 'Published' },
+  { id: 'all',              label: 'All' },
+  { id: 'awaiting_client',  label: 'Needs Approval' },
+  { id: 'approved',         label: 'Approved' },
+  { id: 'revision_needed',  label: 'Revision' },
+  { id: 'published',        label: 'Published' },
 ]
+
+// Statuses on which the client can act
+const CLIENT_ACTIONABLE = new Set(['awaiting_client'])
 
 export default function PortalContent() {
   const { toast } = useToast()
@@ -102,7 +105,7 @@ export default function PortalContent() {
               {item.caption && (
                 <p className="text-xs text-fg-2 mt-2 line-clamp-2">{item.caption}</p>
               )}
-              {item.status === 'in_review' && (
+              {CLIENT_ACTIONABLE.has(item.status) && (
                 <div className="mt-3 flex gap-2">
                   <span className="text-[10px] px-2 py-1 rounded-lg bg-[var(--color-warning)]/10 text-[var(--color-warning)] font-medium">Awaiting your approval</span>
                 </div>
@@ -118,7 +121,7 @@ export default function PortalContent() {
           footer={
             <div className="flex gap-2 w-full">
               <button className="btn btn-secondary" onClick={() => setSelected(null)}>Close</button>
-              {selected.status === 'in_review' && (
+              {CLIENT_ACTIONABLE.has(selected.status) && (
                 <>
                   <button className="btn btn-ghost gap-1 text-[var(--color-danger)] ml-auto" onClick={() => setShowRejectInput(s => !s)} disabled={saving}>
                     <ThumbsDown size={14} /> Reject

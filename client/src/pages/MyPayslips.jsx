@@ -29,7 +29,15 @@ export default function MyPayslipsPage() {
   const handleDownload = async (record) => {
     setDownloading(record._id)
     try {
-      await api.downloadPayslip(record._id)
+      const res = await api.downloadPayslip(record._id)
+      if (!res.ok) throw new Error('Failed to generate payslip')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `payslip-${MONTHS[(record.month || 1) - 1]}-${record.year || ''}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
     } catch (err) {
       toast.error(err.message || 'Download failed')
     } finally {

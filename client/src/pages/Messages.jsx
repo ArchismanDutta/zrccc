@@ -1,22 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { io } from 'socket.io-client'
 import { MessageSquare, Send, Plus, Hash, User as UserIcon } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
+import { useToast } from '@/components/ui/Toast'
 import api from '@/lib/api'
-
-const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'
-
-let socketInstance = null
-
-function getSocket() {
-  if (!socketInstance) {
-    socketInstance = io(SOCKET_URL, {
-      withCredentials: true,
-      autoConnect: false,
-    })
-  }
-  return socketInstance
-}
+import { getSocket } from '@/lib/socket'
 
 // ─── Channel List ──────────────────────────────────────────────
 function ChannelList({ channels, activeId, onSelect, onNewDm, onNewChannel }) {
@@ -165,7 +152,7 @@ function NewDmModal({ onClose, onCreated }) {
 
   const handleSelect = async (userId) => {
     try {
-      const res = await api.post('/messages/channels/direct', { userId })
+      const res = await api.createDirectChannel(userId)
       onCreated(res.data)
     } catch (_) {}
     onClose()
@@ -200,6 +187,7 @@ function NewDmModal({ onClose, onCreated }) {
 
 // ─── New Project Channel Modal ────────────────────────────────
 function NewProjectChannelModal({ onClose, onCreated }) {
+  const { toast } = useToast()
   const [projects, setProjects] = useState([])
   const [projectId, setProjectId] = useState('')
   const [name, setName] = useState('')
@@ -219,9 +207,12 @@ function NewProjectChannelModal({ onClose, onCreated }) {
     try {
       const res = await api.createProjectChannel({ projectId, name: name.trim() })
       onCreated(res.data)
-    } catch (_) {}
-    onClose()
-    setSaving(false)
+      onClose()
+    } catch (err) {
+      toast.error(err.message || 'Failed to create channel')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleProjectChange = (id) => {
@@ -268,6 +259,7 @@ function NewProjectChannelModal({ onClose, onCreated }) {
 // ─── Main Page ─────────────────────────────────────────────────
 export default function MessagesPage() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const [channels, setChannels] = useState([])
   const [activeChannel, setActiveChannel] = useState(null)
   const [messages, setMessages] = useState([])
@@ -277,6 +269,7 @@ export default function MessagesPage() {
   const messagesEndRef = useRef(null)
   const typingTimerRef = useRef({})
   const usersMapRef = useRef({})
+  const activeChannelRef = useRef(null)
   const socket = getSocket()
 
   // Seed current user into the map
@@ -286,9 +279,12 @@ export default function MessagesPage() {
     }
   }, [user])
 
+  // Keep ref in sync so socket handlers always read the latest activeChannel
+  useEffect(() => { activeChannelRef.current = activeChannel }, [activeChannel])
+
   // Load channels
   useEffect(() => {
-    api.getChannels().then(r => setChannels(r.data || [])).catch(() => {})
+    api.getChannels().then(r => setChannels(r.data || [])).catch(err => toast.error(err.message || 'Failed to load channels'))
   }, [])
 
   // Socket.io connection
@@ -299,7 +295,7 @@ export default function MessagesPage() {
       if (message.senderId?._id) {
         usersMapRef.current[String(message.senderId._id)] = message.senderId.name
       }
-      if (activeChannel?._id === channelId || !activeChannel) {
+      if (activeChannelRef.current?._id === channelId) {
         setMessages(prev => [...prev, message])
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
       }
@@ -319,8 +315,6 @@ export default function MessagesPage() {
     return () => {
       socket.off('message:receive')
       socket.off('message:typing')
-      socket.disconnect()
-      socketInstance = null
     }
   }, [])
 
@@ -339,7 +333,7 @@ export default function MessagesPage() {
         setMessages(msgs)
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
       })
-      .catch(() => {})
+      .catch(err => toast.error(err.message || 'Failed to load messages'))
     return () => socket.emit('channel:leave', activeChannel._id)
   }, [activeChannel?._id])
 
