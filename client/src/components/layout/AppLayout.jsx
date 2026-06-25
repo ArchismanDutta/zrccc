@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
+import { CommandPalette } from '@/components/ui/CommandPalette'
 import { applyTheme, loadTheme, loadDarkMode, setDarkMode } from '@/lib/theme'
 import { useAuth } from '@/lib/auth'
 
@@ -11,6 +12,7 @@ export function AppLayout() {
   const [collapsed, setCollapsed] = useState(isMobile)
   const [isDark, setIsDark] = useState(loadDarkMode)
   const [themeId, setThemeId] = useState(() => loadTheme().id)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   useEffect(() => {
     const preset = loadTheme()
@@ -32,6 +34,18 @@ export function AppLayout() {
     return () => window.removeEventListener('resize', handleResize)
   }, [handleResize])
 
+  // ⌘K / Ctrl+K opens the command palette
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(o => !o)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   const userData = user || { name: 'Admin', role: 'super_admin', email: 'admin@zrcmedia.in' }
   const sidebarOffset = isMobile ? '0px' : collapsed ? '68px' : '240px'
 
@@ -52,7 +66,9 @@ export function AppLayout() {
           onToggleDark={setIsDark}
           currentThemeId={themeId}
           onThemeChange={setThemeId}
+          onSearchOpen={() => setSearchOpen(true)}
         />
+        <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
         <main className="flex-1 overflow-x-hidden" style={{ paddingTop: 'var(--topbar-h)', background: 'var(--color-bg)' }}>
           <div className="p-3 sm:p-4 lg:p-5 max-w-[1600px] mx-auto w-full">

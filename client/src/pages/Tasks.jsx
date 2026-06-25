@@ -46,7 +46,7 @@ const ALL_STATUSES = [
   { id: 'cancelled',       label: 'Cancelled' },
 ]
 
-const EMPTY = { title: '', description: '', category: '', projectId: '', assignedTo: [], priority: 'medium', dueDate: '', estimatedHours: '', status: 'todo' }
+const EMPTY = { title: '', description: '', category: '', projectId: '', assignedTo: [], priority: 'medium', dueDate: '', estimatedHours: '', status: 'todo', isRecurring: false, recurringFrequency: 'weekly' }
 
 // ─── Status Dropdown for kanban card ────────────────────────
 function QuickStatusMenu({ task, onMove }) {
@@ -140,6 +140,31 @@ function TaskForm({ form, setForm, users, projects }) {
           ))}
         </div>
       </div>
+
+      {/* Recurring */}
+      <div className="pt-1 border-t border-[var(--color-border)]">
+        <label className="flex items-center gap-2.5 cursor-pointer w-fit">
+          <div
+            onClick={() => setForm(f => ({ ...f, isRecurring: !f.isRecurring }))}
+            className={`w-9 h-5 rounded-full relative transition-colors flex-shrink-0 ${form.isRecurring ? 'bg-accent' : 'bg-[var(--color-surface-3)]'}`}>
+            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.isRecurring ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          </div>
+          <span className="text-xs font-medium text-fg-2">Recurring task</span>
+        </label>
+        {form.isRecurring && (
+          <div className="mt-2 flex items-center gap-2">
+            <label className="text-xs text-fg-3 flex-shrink-0">Repeat every</label>
+            <select className="input text-xs py-1" style={{ maxWidth: 140 }}
+              value={form.recurringFrequency}
+              onChange={e => setForm(f => ({ ...f, recurringFrequency: e.target.value }))}>
+              <option value="daily">Day</option>
+              <option value="weekly">Week</option>
+              <option value="biweekly">2 Weeks</option>
+              <option value="monthly">Month</option>
+            </select>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -188,15 +213,17 @@ export default function TasksPage() {
   const openEdit = async (task) => {
     setEditTask(task)
     setForm({
-      title:          task.title || '',
-      description:    task.description || '',
-      category:       task.category || '',
-      projectId:      task.projectId?._id || task.projectId || '',
-      assignedTo:     (task.assignedTo || []).map(u => u._id || u),
-      priority:       task.priority || 'medium',
-      dueDate:        task.dueDate ? task.dueDate.split('T')[0] : '',
-      estimatedHours: task.estimatedHours || '',
-      status:         task.status || 'todo',
+      title:              task.title || '',
+      description:        task.description || '',
+      category:           task.category || '',
+      projectId:          task.projectId?._id || task.projectId || '',
+      assignedTo:         (task.assignedTo || []).map(u => u._id || u),
+      priority:           task.priority || 'medium',
+      dueDate:            task.dueDate ? task.dueDate.split('T')[0] : '',
+      estimatedHours:     task.estimatedHours || '',
+      status:             task.status || 'todo',
+      isRecurring:        task.isRecurring || false,
+      recurringFrequency: task.recurringConfig?.frequency || 'weekly',
     })
     setModalOpen(true)
     if (!projects.length) await loadFormDeps()
@@ -206,19 +233,30 @@ export default function TasksPage() {
     if (!form.title || !form.category) { toast.error('Title and category are required'); return }
     setSaving(true)
     try {
+      const recurringPayload = {
+        isRecurring: form.isRecurring,
+        recurringConfig: form.isRecurring ? { frequency: form.recurringFrequency } : undefined,
+      }
       if (editTask) {
         await api.updateTask(editTask._id, {
           title: form.title, description: form.description, category: form.category,
           projectId: form.projectId || null, assignedTo: form.assignedTo,
           priority: form.priority, dueDate: form.dueDate || null,
           estimatedHours: Number(form.estimatedHours) || 0,
+          ...recurringPayload,
         })
         if (form.status !== editTask.status) {
           await api.changeTaskStatus(editTask._id, { status: form.status })
         }
         toast.success('Task updated')
       } else {
-        await api.createTask({ ...form, estimatedHours: Number(form.estimatedHours) || 0 })
+        await api.createTask({
+          title: form.title, description: form.description, category: form.category,
+          projectId: form.projectId || null, assignedTo: form.assignedTo,
+          priority: form.priority, dueDate: form.dueDate || null,
+          estimatedHours: Number(form.estimatedHours) || 0,
+          ...recurringPayload,
+        })
         toast.success('Task created!')
       }
       setModalOpen(false); fetchTasks()
@@ -313,7 +351,10 @@ export default function TasksPage() {
                         className="card p-3 sm:p-3.5 cursor-pointer hover:border-[var(--color-accent-ring)] transition-colors"
                         onClick={() => navigate(`/tasks/${task._id}`)}>
                         <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <p className="text-[13px] sm:text-sm font-medium text-fg leading-snug">{task.title}</p>
+                          <p className="text-[13px] sm:text-sm font-medium text-fg leading-snug">
+                            {task.isRecurring && <span className="mr-1 text-accent text-[10px]" title="Recurring">🔁</span>}
+                            {task.title}
+                          </p>
                           <PriorityBadge priority={task.priority} />
                         </div>
                         {task.description && (
@@ -357,7 +398,10 @@ export default function TasksPage() {
                 return (
                   <tr key={t._id} className="cursor-pointer" onClick={() => navigate(`/tasks/${t._id}`)}>
                     <td>
-                      <p className="font-medium text-fg whitespace-nowrap">{t.title}</p>
+                      <p className="font-medium text-fg whitespace-nowrap">
+                        {t.isRecurring && <span className="mr-1 text-accent text-[10px]" title="Recurring">🔁</span>}
+                        {t.title}
+                      </p>
                       {t.description && <p className="text-xs text-fg-3 mt-0.5 max-w-[200px] truncate">{t.description}</p>}
                     </td>
                     <td>{cat && <span className="text-xs whitespace-nowrap" style={{ color: cat.colour }}>{cat.label}</span>}</td>

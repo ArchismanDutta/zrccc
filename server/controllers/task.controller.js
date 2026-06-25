@@ -6,6 +6,18 @@ const { escapeRegex, sanitizeSort, parsePagination } = require("../utils/sanitiz
 const TASK_SORTS      = ["-createdAt", "createdAt", "dueDate", "-dueDate", "priority", "-priority", "-updatedAt", "updatedAt"];
 const TASK_STATUSES   = ["todo", "in_progress", "review", "revision_needed", "done", "cancelled"];
 const TASK_CATEGORIES = ["shooting", "reel_editing", "video_editing", "graphic_design", "carousel_design", "meta_ad_creative", "meta_ads_management", "caption_writing", "ad_copy", "content_planning", "scheduling", "web_development", "web_maintenance", "client_report", "internal", "review"];
+const RECURRING_FREQS = ["daily", "weekly", "biweekly", "monthly"];
+
+function computeNextRunAt(base, frequency) {
+  const d = new Date(base);
+  switch (frequency) {
+    case "daily":    d.setDate(d.getDate() + 1);   break;
+    case "weekly":   d.setDate(d.getDate() + 7);   break;
+    case "biweekly": d.setDate(d.getDate() + 14);  break;
+    case "monthly":  d.setMonth(d.getMonth() + 1); break;
+  }
+  return d;
+}
 const { success, created, paginated } = require("../utils/response");
 const { ValidationError, NotFoundError } = require("../utils/errors");
 const { logAudit } = require("../services/audit.service");
@@ -40,6 +52,21 @@ exports.createTask = async (req, res, next) => {
     const seq = await nextSequence("task");
     const taskId = `ZRC-TSK-${String(seq).padStart(5, "0")}`;
 
+    // Build recurring config with computed nextRunAt
+    const isRecurring = !!req.body.isRecurring;
+    const recurringConfig = {};
+    if (isRecurring) {
+      const freq = req.body.recurringConfig?.frequency;
+      if (freq && RECURRING_FREQS.includes(freq)) {
+        recurringConfig.frequency = freq;
+        const base = req.body.dueDate ? new Date(req.body.dueDate) : new Date();
+        recurringConfig.nextRunAt = computeNextRunAt(base, freq);
+      } else {
+        recurringConfig.frequency = "weekly";
+        recurringConfig.nextRunAt = computeNextRunAt(new Date(), "weekly");
+      }
+    }
+
     const task = await Task.create({
       taskId, title, description: req.body.description || "", category,
       projectId: req.body.projectId || null,
@@ -48,8 +75,8 @@ exports.createTask = async (req, res, next) => {
       priority: req.body.priority || "medium", dueDate: req.body.dueDate || null,
       estimatedHours: req.body.estimatedHours || 0,
       tags: req.body.tags || [],
-      isRecurring: req.body.isRecurring || false,
-      recurringConfig: req.body.recurringConfig || {},
+      isRecurring,
+      recurringConfig,
       createdBy: req.user.id,
     });
 
@@ -152,9 +179,21 @@ exports.updateTask = async (req, res, next) => {
     if (!task) throw new NotFoundError("Task");
     await _checkTaskAccess(task, req.user);
 
-    const allowed = ["title", "description", "category", "priority", "dueDate", "estimatedHours", "actualHours", "tags", "assignedTo"];
+    const allowed = ["title", "description", "category", "priority", "dueDate", "estimatedHours", "actualHours", "tags", "assignedTo", "isRecurring"];
     for (const key of allowed) {
       if (req.body[key] !== undefined) task[key] = req.body[key];
+    }
+    // Update recurringConfig when toggling or changing frequency
+    if (req.body.recurringConfig !== undefined) {
+      const freq = req.body.recurringConfig?.frequency;
+      if (freq && RECURRING_FREQS.includes(freq)) {
+        task.recurringConfig.frequency = freq;
+        // Recompute nextRunAt only if not already set or frequency changed
+        if (!task.recurringConfig.nextRunAt || req.body.recurringConfig.frequency) {
+          const base = task.dueDate || new Date();
+          task.recurringConfig.nextRunAt = computeNextRunAt(base, freq);
+        }
+      }
     }
     await task.save();
     await logAudit({ action: "task.update", entity: "Task", entityId: task._id, userId: req.user.id, details: { fields: Object.keys(req.body).filter(k => allowed.includes(k)) }, req });

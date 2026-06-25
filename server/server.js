@@ -120,6 +120,14 @@ async function start() {
       } catch (err) {
         console.warn("⚠️ Mailer not initialized:", err.message);
       }
+
+      // Start recurring task cron
+      try {
+        const { startRecurringCron } = require("./services/recurring.service");
+        startRecurringCron(io);
+      } catch (err) {
+        console.warn("⚠️ Recurring cron not started:", err.message);
+      }
     });
   } catch (err) {
     console.error("❌ Failed to start server:", err.message);

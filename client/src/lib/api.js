@@ -153,6 +153,9 @@ class ApiClient {
   // Audit
   getAuditLogs(q = '') { return this.get(`/audit${q}`) }
 
+  // Search
+  search(q) { return this.get(`/search?q=${encodeURIComponent(q)}`) }
+
   // Messages
   getChannels() { return this.get('/messages/channels') }
   getMessages(channelId, cursor) { return this.get(`/messages/${channelId}${cursor ? `?before=${cursor}` : ''}`) }

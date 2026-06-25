@@ -73,6 +73,115 @@ function DayPopover({ items, onSelect, onClose }) {
   )
 }
 
+// ─── Week View ────────────────────────────────────────────────
+function WeekView({ weekNum, year, month, itemsByDay, daysInMonth, now, onEdit, onCreate }) {
+  const startDay = (weekNum - 1) * 7 + 1
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = startDay + i
+    return d <= daysInMonth ? d : null
+  })
+  return (
+    <div className="flex overflow-x-auto min-h-[380px]">
+      {days.map((day, i) => {
+        const dow       = day != null ? new Date(year, month, day).getDay() : (startDay - 1 + i) % 7
+        const isToday   = day != null && day === now.getDate() && month === now.getMonth() && year === now.getFullYear()
+        const isWeekend = dow === 0 || dow === 6
+        const dayItems  = day != null ? (itemsByDay[day] ?? []) : []
+        const dateStr   = day != null ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : null
+        return (
+          <div key={i} className={`flex-1 min-w-[110px] sm:min-w-[130px] border-r border-[var(--color-border)] flex flex-col ${isWeekend || day == null ? 'bg-[var(--color-surface-2)]' : ''}`}>
+            <div className="px-2 py-2 border-b border-[var(--color-border)] flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[10px] text-fg-3 font-medium">{DAYS[dow]}</span>
+              {day != null && (
+                <span className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-accent text-white' : 'text-fg'}`}>{day}</span>
+              )}
+            </div>
+            <div
+              className={`flex-1 p-1.5 ${day != null ? 'cursor-pointer hover:bg-accent/5' : ''}`}
+              onClick={() => day != null && onCreate(dateStr)}>
+              <div className="space-y-1.5" onClick={e => e.stopPropagation()}>
+                {dayItems.map(item => {
+                  const colour = STATUS_COLOUR[item.status] ?? 'var(--color-fg-3)'
+                  return (
+                    <button key={item._id}
+                      onClick={e => { e.stopPropagation(); onEdit(item) }}
+                      className="w-full text-left p-2 rounded-lg transition-all hover:opacity-80 space-y-1"
+                      style={{ background: `${colour}15`, border: `1px solid ${colour}35` }}>
+                      <p className="text-[10px] font-semibold text-fg leading-tight line-clamp-2">{item.title}</p>
+                      {item.contentType && (
+                        <p className="text-[9px] font-medium leading-none" style={{ color: colour }}>{TYPE_LABEL[item.contentType] || item.contentType}</p>
+                      )}
+                      {item.assignedTo?.length > 0 && (
+                        <div className="flex gap-0.5">
+                          {item.assignedTo.slice(0, 4).map((u, j) => (
+                            <span key={j} className="w-4 h-4 rounded-full bg-accent/20 text-accent text-[8px] font-bold flex items-center justify-center flex-shrink-0">
+                              {(u.name || '?').charAt(0).toUpperCase()}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── List View ────────────────────────────────────────────────
+function ListView({ items, onEdit }) {
+  const byWeek = {}
+  items.forEach(item => {
+    const w = item.weekNumber || 0
+    if (!byWeek[w]) byWeek[w] = []
+    byWeek[w].push(item)
+  })
+  const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b)
+
+  if (items.length === 0) {
+    return <p className="text-sm text-fg-3 text-center py-14">No content planned for this month</p>
+  }
+
+  return (
+    <div className="divide-y divide-[var(--color-border)]">
+      {weeks.map(w => (
+        <div key={w}>
+          <div className="px-4 py-1.5 bg-[var(--color-surface-2)]">
+            <span className="text-[10px] font-semibold text-fg-3 uppercase tracking-wider">{w === 0 ? 'Unscheduled' : `Week ${w}`}</span>
+          </div>
+          {byWeek[w].map(item => {
+            const colour = STATUS_COLOUR[item.status] ?? 'var(--color-fg-3)'
+            return (
+              <button key={item._id} onClick={() => onEdit(item)}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-2)] text-left transition-colors">
+                <span className="w-2 h-2 rounded-full flex-shrink-0 mt-px" style={{ background: colour }} />
+                <span className="flex-1 min-w-0 text-sm font-medium text-fg truncate">{item.title}</span>
+                <span className="text-xs text-fg-3 hidden sm:block flex-shrink-0">{TYPE_LABEL[item.contentType] || item.contentType}</span>
+                <div className="hidden sm:flex gap-1">
+                  {(item.platform || []).slice(0, 3).map(p => (
+                    <span key={p} className="text-[9px] px-1.5 py-0.5 rounded-md bg-[var(--color-surface-3)] text-fg-3 capitalize">{p}</span>
+                  ))}
+                </div>
+                <div className="flex gap-0.5 flex-shrink-0">
+                  {(item.assignedTo || []).slice(0, 3).map((u, j) => (
+                    <span key={j} className="w-5 h-5 rounded-full bg-accent/20 text-accent text-[9px] font-bold flex items-center justify-center">
+                      {(u.name || '?').charAt(0).toUpperCase()}
+                    </span>
+                  ))}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Content Edit/View Modal ─────────────────────────────────
 function ContentModal({ item, isCreate, form, setForm, users, projects, clients, saving, onSave, onStatusChange, onApprove, onReject, onClose }) {
   const [rejectFeedback, setRejectFeedback] = useState('')
@@ -244,6 +353,10 @@ export default function ContentPage() {
   // Filters
   const [clientFilter, setClientFilter]   = useState('')
   const [projectFilter, setProjectFilter] = useState('')
+
+  // View mode
+  const [viewMode, setViewMode] = useState('month')
+  const [weekNum, setWeekNum]   = useState(() => Math.ceil(now.getDate() / 7))
 
   // Drag to reschedule
   const [draggingId, setDraggingId]   = useState(null)
@@ -494,87 +607,123 @@ export default function ContentPage() {
           <button onClick={nextMonth} className="btn btn-ghost btn-icon" style={{ width: 32, height: 32, minHeight: 32 }}><ChevronRight size={16} /></button>
         </div>
 
-        {/* Day names */}
-        <div className="grid grid-cols-7 border-b border-[var(--color-border)]">
-          {(isMobile ? DAYS_SHORT : DAYS).map((d, i) => (
-            <div key={i} className="py-1.5 sm:py-2 text-center text-[10px] sm:text-[11px] font-semibold text-fg-3 uppercase tracking-wide">{d}</div>
-          ))}
+        {/* View toggle + week tabs */}
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-[var(--color-border)]">
+          <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--color-surface-2)]">
+            {[['month','Month'],['week','Week'],['list','List']].map(([mode, label]) => (
+              <button key={mode} onClick={() => setViewMode(mode)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === mode ? 'bg-[var(--color-surface)] text-fg shadow-sm' : 'text-fg-3 hover:text-fg'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {viewMode === 'week' && (
+            <div className="flex gap-1">
+              {[1,2,3,4,5].filter(w => (w - 1) * 7 + 1 <= daysInMonth).map(w => (
+                <button key={w} onClick={() => setWeekNum(w)}
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors ${weekNum === w ? 'bg-accent text-white' : 'text-fg-3 hover:bg-[var(--color-surface-3)] hover:text-fg'}`}>
+                  W{w}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-16 sm:py-20">
             <div className="w-7 h-7 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
           </div>
+        ) : viewMode === 'week' ? (
+          <WeekView
+            weekNum={weekNum}
+            year={year}
+            month={month}
+            itemsByDay={itemsByDay}
+            daysInMonth={daysInMonth}
+            now={now}
+            onEdit={openEdit}
+            onCreate={openCreate}
+          />
+        ) : viewMode === 'list' ? (
+          <ListView items={items} onEdit={openEdit} />
         ) : (
-          <div className="grid grid-cols-7">
-            {/* Leading empty cells */}
-            {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`e-${i}`} className="min-h-[52px] sm:min-h-[88px] lg:min-h-[108px] border-r border-b border-[var(--color-border)] bg-[var(--color-surface-2)]" />
-            ))}
+          <>
+            {/* Day names */}
+            <div className="grid grid-cols-7 border-b border-[var(--color-border)]">
+              {(isMobile ? DAYS_SHORT : DAYS).map((d, i) => (
+                <div key={i} className="py-1.5 sm:py-2 text-center text-[10px] sm:text-[11px] font-semibold text-fg-3 uppercase tracking-wide">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {/* Leading empty cells */}
+              {Array.from({ length: firstDay }).map((_, i) => (
+                <div key={`e-${i}`} className="min-h-[52px] sm:min-h-[88px] lg:min-h-[108px] border-r border-b border-[var(--color-border)] bg-[var(--color-surface-2)]" />
+              ))}
 
-            {/* Day cells */}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1
-              const dayItems = itemsByDay[day] ?? []
-              const isToday  = day === now.getDate() && month === now.getMonth() && year === now.getFullYear()
-              const col      = (firstDay + i) % 7
-              const isWeekend = col === 0 || col === 6
-              const visible  = dayItems.slice(0, MAX_SHOW)
-              const overflow = dayItems.length - MAX_SHOW
+              {/* Day cells */}
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const day = i + 1
+                const dayItems = itemsByDay[day] ?? []
+                const isToday  = day === now.getDate() && month === now.getMonth() && year === now.getFullYear()
+                const col      = (firstDay + i) % 7
+                const isWeekend = col === 0 || col === 6
+                const visible  = dayItems.slice(0, MAX_SHOW)
+                const overflow = dayItems.length - MAX_SHOW
 
-              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 
-              return (
-                <div key={day}
-                  onClick={() => { if (!draggingRef.current) openCreate(dateStr) }}
-                  onDragOver={e => { e.preventDefault(); setDragOverDay(day) }}
-                  onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverDay(null) }}
-                  onDrop={e => { e.preventDefault(); handleDrop(day) }}
-                  className={`group relative min-h-[52px] sm:min-h-[88px] lg:min-h-[108px] border-r border-b border-[var(--color-border)] p-0.5 sm:p-1.5 cursor-pointer transition-colors hover:bg-accent/5 ${isWeekend ? 'bg-[var(--color-surface-2)] hover:bg-accent/5' : ''} ${draggingId && dragOverDay === day ? 'ring-2 ring-inset ring-accent/50 bg-accent/5' : ''}`}>
-                  {/* Day number + add hint */}
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[9px] text-accent opacity-0 group-hover:opacity-100 transition-opacity font-bold pl-0.5 sm:pl-1 leading-none hidden sm:block">+</span>
-                    <span className={`text-[9px] sm:text-[11px] font-semibold w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded-full ml-auto ${isToday ? 'bg-accent text-white' : 'text-fg-3'}`}>{day}</span>
+                return (
+                  <div key={day}
+                    onClick={() => { if (!draggingRef.current) openCreate(dateStr) }}
+                    onDragOver={e => { e.preventDefault(); setDragOverDay(day) }}
+                    onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverDay(null) }}
+                    onDrop={e => { e.preventDefault(); handleDrop(day) }}
+                    className={`group relative min-h-[52px] sm:min-h-[88px] lg:min-h-[108px] border-r border-b border-[var(--color-border)] p-0.5 sm:p-1.5 cursor-pointer transition-colors hover:bg-accent/5 ${isWeekend ? 'bg-[var(--color-surface-2)] hover:bg-accent/5' : ''} ${draggingId && dragOverDay === day ? 'ring-2 ring-inset ring-accent/50 bg-accent/5' : ''}`}>
+                    {/* Day number + add hint */}
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[9px] text-accent opacity-0 group-hover:opacity-100 transition-opacity font-bold pl-0.5 sm:pl-1 leading-none hidden sm:block">+</span>
+                      <span className={`text-[9px] sm:text-[11px] font-semibold w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded-full ml-auto ${isToday ? 'bg-accent text-white' : 'text-fg-3'}`}>{day}</span>
+                    </div>
+
+                    {/* Events */}
+                    <div className="space-y-0.5">
+                      {visible.map(item => {
+                        const colour = STATUS_COLOUR[item.status] ?? 'var(--color-fg-3)'
+                        return (
+                          <button key={item._id}
+                            draggable
+                            onDragStart={e => { e.stopPropagation(); setDraggingId(item._id); draggingRef.current = true }}
+                            onDragEnd={e => { e.stopPropagation(); setDraggingId(null); setDragOverDay(null); draggingRef.current = false }}
+                            onClick={e => { e.stopPropagation(); openEdit(item) }}
+                            className={`w-full flex items-center gap-0.5 px-1 sm:px-1.5 py-px sm:py-0.5 rounded-md text-[8px] sm:text-[10px] font-medium truncate text-left hover:opacity-80 transition-opacity ${draggingId === item._id ? 'opacity-40' : ''}`}
+                            style={{ background: `${colour}18`, color: colour, border: `1px solid ${colour}30` }}>
+                            <span className="truncate">{item.title}</span>
+                          </button>
+                        )
+                      })}
+
+                      {/* Overflow badge */}
+                      {overflow > 0 && (
+                        <div className="relative">
+                          <button
+                            onClick={e => { e.stopPropagation(); setOverflowDay(overflowDay === day ? null : day) }}
+                            className="text-[8px] sm:text-[9px] text-accent font-medium pl-1 hover:underline">
+                            +{overflow} more
+                          </button>
+                          {overflowDay === day && (
+                            <DayPopover
+                              items={dayItems}
+                              onSelect={openEdit}
+                              onClose={() => setOverflowDay(null)} />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-
-                  {/* Events */}
-                  <div className="space-y-0.5">
-                    {visible.map(item => {
-                      const colour = STATUS_COLOUR[item.status] ?? 'var(--color-fg-3)'
-                      return (
-                        <button key={item._id}
-                          draggable
-                          onDragStart={e => { e.stopPropagation(); setDraggingId(item._id); draggingRef.current = true }}
-                          onDragEnd={e => { e.stopPropagation(); setDraggingId(null); setDragOverDay(null); draggingRef.current = false }}
-                          onClick={e => { e.stopPropagation(); openEdit(item) }}
-                          className={`w-full flex items-center gap-0.5 px-1 sm:px-1.5 py-px sm:py-0.5 rounded-md text-[8px] sm:text-[10px] font-medium truncate text-left hover:opacity-80 transition-opacity ${draggingId === item._id ? 'opacity-40' : ''}`}
-                          style={{ background: `${colour}18`, color: colour, border: `1px solid ${colour}30` }}>
-                          <span className="truncate">{item.title}</span>
-                        </button>
-                      )
-                    })}
-
-                    {/* Overflow badge */}
-                    {overflow > 0 && (
-                      <div className="relative">
-                        <button
-                          onClick={e => { e.stopPropagation(); setOverflowDay(overflowDay === day ? null : day) }}
-                          className="text-[8px] sm:text-[9px] text-accent font-medium pl-1 hover:underline">
-                          +{overflow} more
-                        </button>
-                        {overflowDay === day && (
-                          <DayPopover
-                            items={dayItems}
-                            onSelect={openEdit}
-                            onClose={() => setOverflowDay(null)} />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          </>
         )}
       </div>
 

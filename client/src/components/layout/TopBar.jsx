@@ -23,7 +23,7 @@ const PAGE_TITLES = {
   '/messages': 'Messages', '/reports': 'Reports', '/settings': 'Settings',
 }
 
-export function TopBar({ sidebarCollapsed, isMobile, onMobileMenu, user, isDark, onToggleDark, currentThemeId, onThemeChange }) {
+export function TopBar({ sidebarCollapsed, isMobile, onMobileMenu, user, isDark, onToggleDark, currentThemeId, onThemeChange, onSearchOpen }) {
   const location = useLocation()
   const { logout } = useAuth()
   const [showThemePicker, setShowThemePicker] = useState(false)
@@ -93,7 +93,7 @@ export function TopBar({ sidebarCollapsed, isMobile, onMobileMenu, user, isDark,
       </div>
 
       {/* Search — hidden on mobile */}
-      <button className="btn btn-ghost btn-icon hidden sm:flex" title="Search (⌘K)"><Search size={18} /></button>
+      <button className="btn btn-ghost btn-icon hidden sm:flex" title="Search (⌘K)" onClick={onSearchOpen}><Search size={18} /></button>
 
       {/* Dark mode */}
       <button className="btn btn-ghost btn-icon flex-shrink-0" onClick={() => { setDarkMode(!isDark); onToggleDark(!isDark) }} title={isDark ? 'Light mode' : 'Dark mode'}>
