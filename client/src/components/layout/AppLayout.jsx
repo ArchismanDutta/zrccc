@@ -3,8 +3,10 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { CommandPalette } from '@/components/ui/CommandPalette'
+import { ShortcutsHelp } from '@/components/ui/ShortcutsHelp'
 import { applyTheme, loadTheme, loadDarkMode, setDarkMode } from '@/lib/theme'
 import { useAuth } from '@/lib/auth'
+import { useAppShortcuts } from '@/lib/shortcuts'
 
 export function AppLayout() {
   const { user } = useAuth()
@@ -13,6 +15,9 @@ export function AppLayout() {
   const [isDark, setIsDark] = useState(loadDarkMode)
   const [themeId, setThemeId] = useState(() => loadTheme().id)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+
+  useAppShortcuts()
 
   useEffect(() => {
     const preset = loadTheme()
@@ -46,6 +51,13 @@ export function AppLayout() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // ? opens the shortcuts help overlay
+  useEffect(() => {
+    const handler = () => setHelpOpen(true)
+    window.addEventListener('shortcut:help', handler)
+    return () => window.removeEventListener('shortcut:help', handler)
+  }, [])
+
   const userData = user || { name: 'Admin', role: 'super_admin', email: 'admin@zrcmedia.in' }
   const sidebarOffset = isMobile ? '0px' : collapsed ? '68px' : '240px'
 
@@ -69,6 +81,7 @@ export function AppLayout() {
           onSearchOpen={() => setSearchOpen(true)}
         />
         <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+        <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
 
         <main className="flex-1 overflow-x-hidden" style={{ paddingTop: 'var(--topbar-h)', background: 'var(--color-bg)' }}>
           <div className="p-3 sm:p-4 lg:p-5 max-w-[1600px] mx-auto w-full">

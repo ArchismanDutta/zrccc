@@ -378,6 +378,11 @@ export default function ContentPage() {
   }
 
   useEffect(() => { fetchContent() }, [year, month, clientFilter, projectFilter])
+  useEffect(() => {
+    const handler = () => { setEditItem(null); setForm({ ...EMPTY_FORM }); setModalOpen(true) }
+    window.addEventListener('shortcut:new', handler)
+    return () => window.removeEventListener('shortcut:new', handler)
+  }, [])
   useEffect(() => { loadFormDeps() }, [])
 
   const loadFormDeps = async () => {

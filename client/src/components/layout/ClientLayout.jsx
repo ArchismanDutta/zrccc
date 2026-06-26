@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, Calendar, FileText, LogOut, Menu, X, Sun, Moon, LifeBuoy } from 'lucide-react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { LayoutDashboard, Briefcase, FileText, LogOut, Menu, X, Sun, Moon, LifeBuoy, Settings, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/Avatar'
 import { useAuth } from '@/lib/auth'
@@ -9,16 +9,18 @@ import { setDarkMode, loadDarkMode } from '@/lib/theme'
 const NAV = [
   { to: '/portal/overview',  icon: LayoutDashboard, label: 'Overview' },
   { to: '/portal/projects',  icon: Briefcase,       label: 'My Projects' },
-  { to: '/portal/content',   icon: Calendar,        label: 'Content' },
   { to: '/portal/invoices',  icon: FileText,        label: 'Invoices' },
   { to: '/portal/tickets',   icon: LifeBuoy,        label: 'Support' },
+  { to: '/portal/settings',  icon: Settings,        label: 'Settings' },
 ]
 
 export function ClientLayout() {
   const { user, logout } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isDark, setIsDark] = useState(loadDarkMode)
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   const toggleDark = () => { setDarkMode(!isDark); setIsDark(d => !d) }
 
@@ -88,7 +90,46 @@ export function ClientLayout() {
           <button onClick={toggleDark} className="btn btn-ghost btn-icon" title={isDark ? 'Light mode' : 'Dark mode'}>
             {isDark ? <Sun size={17} /> : <Moon size={17} />}
           </button>
-          <Avatar name={user?.name ?? 'Client'} size="sm" />
+
+          {/* Profile dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(s => !s)}
+              className="flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-[var(--color-surface-3)] transition-colors"
+            >
+              <Avatar name={user?.name ?? 'Client'} size="sm" />
+              <div className="hidden sm:block text-left">
+                <p className="text-xs font-semibold text-fg leading-none">{user?.name ?? 'Client'}</p>
+                <p className="text-[10px] text-fg-3 mt-0.5">Client Portal</p>
+              </div>
+              <ChevronDown size={13} className="text-fg-3 hidden sm:block" />
+            </button>
+
+            {showUserMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
+                <div className="absolute right-0 top-full mt-2 z-50 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden"
+                  style={{ boxShadow: 'var(--shadow-lg)', minWidth: 200 }}>
+                  <div className="px-4 py-3 border-b border-[var(--color-border)]">
+                    <p className="text-sm font-semibold text-fg">{user?.name ?? 'Client'}</p>
+                    <p className="text-xs text-fg-3 mt-0.5">{user?.email ?? ''}</p>
+                  </div>
+                  <div className="p-1.5 space-y-0.5">
+                    <button
+                      onClick={() => { setShowUserMenu(false); navigate('/portal/settings') }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-fg hover:bg-[var(--color-surface-3)] transition-colors">
+                      <Settings size={14} /> Account Settings
+                    </button>
+                    <button
+                      onClick={() => { setShowUserMenu(false); logout() }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors font-medium">
+                      <LogOut size={14} /> Sign Out
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </header>
 
         {/* Page content */}

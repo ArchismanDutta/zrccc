@@ -91,6 +91,11 @@ export default function FinancePage() {
   }
 
   useEffect(() => { fetchAll(); fetchExpenses(); if (isAdmin) fetchPL() }, [])
+  useEffect(() => {
+    const handler = () => setInvModalOpen(true)
+    window.addEventListener('shortcut:new', handler)
+    return () => window.removeEventListener('shortcut:new', handler)
+  }, [])
   useEffect(() => { fetchExpenses() }, [expMonth, expYear])
   useEffect(() => { if (isAdmin) fetchPL(plMonths) }, [plMonths])
 

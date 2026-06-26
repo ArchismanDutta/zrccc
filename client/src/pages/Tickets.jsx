@@ -52,6 +52,11 @@ export default function TicketsPage() {
   }
 
   useEffect(() => { fetchTickets() }, [filterStatus, filterPriority])
+  useEffect(() => {
+    const handler = () => { setForm({ ...EMPTY_FORM }); setCreateOpen(true) }
+    window.addEventListener('shortcut:new', handler)
+    return () => window.removeEventListener('shortcut:new', handler)
+  }, [])
 
   useEffect(() => {
     if (canManage) {

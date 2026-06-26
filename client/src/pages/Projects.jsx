@@ -68,6 +68,11 @@ export default function ProjectsPage() {
     catch { toast.error('Failed to load projects') } finally { setLoading(false) }
   }
   useEffect(() => { fetchProjects() }, [])
+  useEffect(() => {
+    const handler = () => { setForm({ name: '', clientId: '', projectManagerId: '', teamMemberIds: [], type: [], priority: 'medium', startDate: '', endDate: '', budget: '' }); setModalOpen(true) }
+    window.addEventListener('shortcut:new', handler)
+    return () => window.removeEventListener('shortcut:new', handler)
+  }, [])
 
   const openModal = async () => {
     setForm({ name: '', clientId: '', projectManagerId: '', teamMemberIds: [], type: [], priority: 'medium', startDate: '', endDate: '', budget: '' })

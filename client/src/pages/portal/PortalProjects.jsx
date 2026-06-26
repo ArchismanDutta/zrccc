@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { Users, User } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
-import { StatusBadge } from '@/components/ui/Badge'
+import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
+import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
 import api from '@/lib/api'
 
@@ -35,45 +37,78 @@ export default function PortalProjects() {
         <div className="space-y-3">
           {projects.map(p => (
             <div key={p._id} className="card p-4 sm:p-5">
+              {/* Header */}
               <div className="flex items-start justify-between gap-3 mb-3">
-                <div>
-                  <p className="font-semibold text-fg">{p.name}</p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-fg">{p.name}</p>
+                    <PriorityBadge priority={p.priority} />
+                  </div>
                   <p className="text-xs text-fg-3 font-mono mt-0.5">{p.projectId}</p>
                 </div>
                 <StatusBadge status={p.status} />
               </div>
 
-              {p.description && <p className="text-sm text-fg-2 mb-3">{p.description}</p>}
+              {p.description && <p className="text-sm text-fg-2 mb-3 leading-relaxed">{p.description}</p>}
 
               {/* Progress bar */}
-              <div className="mb-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-fg-3">Progress</span>
-                  <span className="text-xs font-semibold text-fg">{p.overallProgress || 0}%</span>
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs text-fg-3">Overall Progress</span>
+                  <span className="text-xs font-bold text-fg">{p.overallProgress || 0}%</span>
                 </div>
-                <div className="h-1.5 rounded-full bg-[var(--color-surface-3)] overflow-hidden">
-                  <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${p.overallProgress || 0}%` }} />
+                <div className="h-2 rounded-full bg-[var(--color-surface-3)] overflow-hidden">
+                  <div className="h-full rounded-full bg-accent transition-all duration-500"
+                    style={{ width: `${p.overallProgress || 0}%` }} />
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3 text-xs text-fg-3">
+              {/* Meta row */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-3 mb-3">
                 {p.startDate && <span>Start: {formatDate(p.startDate)}</span>}
-                {p.endDate && <span>End: {formatDate(p.endDate)}</span>}
+                {p.endDate && <span>Deadline: {formatDate(p.endDate)}</span>}
                 {(p.type || []).length > 0 && (
                   <span className="capitalize">{(p.type || []).map(t => t.replace(/_/g, ' ')).join(', ')}</span>
+                )}
+              </div>
+
+              {/* PM + team */}
+              <div className="flex items-center gap-4 pt-3 border-t border-[var(--color-border)]">
+                {p.projectManagerId?.name && (
+                  <div className="flex items-center gap-1.5">
+                    <Avatar name={p.projectManagerId.name} size="xs" />
+                    <div>
+                      <p className="text-[10px] text-fg-3 leading-none">Project Manager</p>
+                      <p className="text-xs font-medium text-fg mt-0.5">{p.projectManagerId.name}</p>
+                    </div>
+                  </div>
+                )}
+                {(p.teamMembers || []).length > 0 && (
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <Users size={12} className="text-fg-3" />
+                    <span className="text-xs text-fg-3">{p.teamMembers.length} member{p.teamMembers.length !== 1 ? 's' : ''}</span>
+                  </div>
                 )}
               </div>
 
               {/* Milestones */}
               {(p.milestones || []).length > 0 && (
                 <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
-                  <p className="text-xs font-semibold text-fg-2 mb-2">Milestones</p>
-                  <div className="space-y-1.5">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-fg-2">Milestones</p>
+                    <p className="text-[10px] text-fg-3">
+                      {p.milestones.filter(m => m.isCompleted).length} / {p.milestones.length} done
+                    </p>
+                  </div>
+                  <div className="space-y-2">
                     {p.milestones.map(m => (
-                      <div key={m._id} className="flex items-center gap-2">
-                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${m.isCompleted ? 'bg-[var(--color-success)] border-[var(--color-success)]' : 'border-[var(--color-border)]'}`} />
-                        <span className={`text-xs ${m.isCompleted ? 'line-through text-fg-3' : 'text-fg-2'}`}>{m.title}</span>
-                        {m.dueDate && <span className="text-[10px] text-fg-3 ml-auto">{formatDate(m.dueDate)}</span>}
+                      <div key={m._id} className="flex items-center gap-2.5">
+                        <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors
+                          ${m.isCompleted ? 'bg-[var(--color-success)] border-[var(--color-success)]' : 'border-[var(--color-border)]'}`}>
+                          {m.isCompleted && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 4l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        </div>
+                        <span className={`text-xs flex-1 ${m.isCompleted ? 'line-through text-fg-3' : 'text-fg-2'}`}>{m.title}</span>
+                        {m.dueDate && <span className="text-[10px] text-fg-3 flex-shrink-0">{formatDate(m.dueDate)}</span>}
                       </div>
                     ))}
                   </div>

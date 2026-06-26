@@ -28,6 +28,11 @@ export default function ClientsPage() {
     finally { setLoading(false) }
   }
   useEffect(() => { fetchClients() }, [])
+  useEffect(() => {
+    const handler = () => { setForm({ ...EMPTY_FORM }); setModalOpen(true) }
+    window.addEventListener('shortcut:new', handler)
+    return () => window.removeEventListener('shortcut:new', handler)
+  }, [])
 
   const filtered = clients.filter(c => {
     const matchSearch = (c.companyName || '').toLowerCase().includes(search.toLowerCase()) || (c.contactName || '').toLowerCase().includes(search.toLowerCase())

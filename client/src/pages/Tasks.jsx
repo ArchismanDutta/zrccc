@@ -202,6 +202,11 @@ export default function TasksPage() {
   }
 
   useEffect(() => { fetchTasks() }, [])
+  useEffect(() => {
+    const handler = () => { setEditTask(null); setForm({ ...EMPTY }); setModalOpen(true); loadFormDeps() }
+    window.addEventListener('shortcut:new', handler)
+    return () => window.removeEventListener('shortcut:new', handler)
+  }, [])
 
   const openCreate = async () => {
     setEditTask(null)

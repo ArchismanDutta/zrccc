@@ -131,6 +131,7 @@ class ApiClient {
 
   // Notifications
   getNotifications() { return this.get('/notifications') }
+  markNotificationRead(id) { return this.patch(`/notifications/${id}/read`, {}) }
   markAllRead() { return this.post('/notifications/mark-all-read') }
 
   // Expenses

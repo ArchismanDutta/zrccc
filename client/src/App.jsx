@@ -26,7 +26,8 @@ import PortalOverview    from '@/pages/portal/Overview'
 import PortalProjects    from '@/pages/portal/PortalProjects'
 import PortalContent     from '@/pages/portal/PortalContent'
 import PortalInvoices    from '@/pages/portal/PortalInvoices'
-import PortalTickets from '@/pages/portal/PortalTickets'
+import PortalTickets     from '@/pages/portal/PortalTickets'
+import PortalSettings    from '@/pages/portal/PortalSettings'
 
 function ProtectedRoutes() {
   const { isAuthenticated, loading, user } = useAuth()
@@ -54,7 +55,8 @@ function ProtectedRoutes() {
           <Route path="projects"  element={<PortalProjects />} />
           <Route path="content"   element={<PortalContent />} />
           <Route path="invoices"  element={<PortalInvoices />} />
-          <Route path="tickets"  element={<PortalTickets />} />
+          <Route path="tickets"   element={<PortalTickets />} />
+          <Route path="settings"  element={<PortalSettings />} />
         </Route>
         <Route path="*" element={<Navigate to="/portal/overview" replace />} />
       </Routes>

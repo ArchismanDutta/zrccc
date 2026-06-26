@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Bell, Search, Sun, Moon, Palette, X, Check, Menu, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/Avatar'
@@ -25,6 +25,7 @@ const PAGE_TITLES = {
 
 export function TopBar({ sidebarCollapsed, isMobile, onMobileMenu, user, isDark, onToggleDark, currentThemeId, onThemeChange, onSearchOpen }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { logout } = useAuth()
   const [showThemePicker, setShowThemePicker] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -95,6 +96,15 @@ export function TopBar({ sidebarCollapsed, isMobile, onMobileMenu, user, isDark,
       {/* Search — hidden on mobile */}
       <button className="btn btn-ghost btn-icon hidden sm:flex" title="Search (⌘K)" onClick={onSearchOpen}><Search size={18} /></button>
 
+      {/* Shortcuts hint */}
+      <button
+        className="btn btn-ghost hidden sm:flex items-center px-1.5 text-fg-3 hover:text-fg"
+        title="Keyboard shortcuts (?)"
+        onClick={() => window.dispatchEvent(new CustomEvent('shortcut:help'))}
+        style={{ fontSize: 11, height: 28, minHeight: 28 }}>
+        <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-semibold border border-[var(--color-border)] rounded-md bg-[var(--color-surface-2)] leading-none">?</kbd>
+      </button>
+
       {/* Dark mode */}
       <button className="btn btn-ghost btn-icon flex-shrink-0" onClick={() => { setDarkMode(!isDark); onToggleDark(!isDark) }} title={isDark ? 'Light mode' : 'Dark mode'}>
         {isDark ? <Sun size={17} /> : <Moon size={17} />}
@@ -157,14 +167,25 @@ export function TopBar({ sidebarCollapsed, isMobile, onMobileMenu, user, isDark,
                 {notifications.length === 0
                   ? <p className="text-xs text-fg-3 text-center py-6">No notifications</p>
                   : notifications.map(n => (
-                    <div key={n._id} className="flex gap-3 px-3 sm:px-4 py-3 hover:bg-[var(--color-surface-2)] transition-colors cursor-pointer">
+                    <button key={n._id}
+                      className="w-full flex gap-3 px-3 sm:px-4 py-3 hover:bg-[var(--color-surface-2)] transition-colors text-left"
+                      onClick={() => {
+                        // Optimistic mark-read
+                        if (!n.isRead) {
+                          setNotifications(prev => prev.map(x => x._id === n._id ? { ...x, isRead: true } : x))
+                          setUnreadCount(c => Math.max(0, c - 1))
+                          api.markNotificationRead(n._id).catch(() => {})
+                        }
+                        setShowNotifications(false)
+                        if (n.link) navigate(n.link)
+                      }}>
                       <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', n.isRead ? 'bg-transparent' : 'bg-accent')} />
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-fg">{n.title}</p>
+                        <p className={cn('text-xs font-medium', n.isRead ? 'text-fg-2' : 'text-fg')}>{n.title}</p>
                         <p className="text-xs text-fg-3 mt-0.5">{n.body}</p>
                         <p className="text-[10px] text-fg-3 mt-1">{relTime(n.createdAt)}</p>
                       </div>
-                    </div>
+                    </button>
                   ))
                 }
               </div>

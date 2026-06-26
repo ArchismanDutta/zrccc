@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Briefcase, FileText, CheckCircle, Clock } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Briefcase, FileText, CheckCircle, Clock, ArrowRight } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/Badge'
 import { useAuth } from '@/lib/auth'
@@ -9,19 +10,20 @@ import api from '@/lib/api'
 export default function PortalOverview() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const navigate = useNavigate()
   const [projects, setProjects] = useState([])
-  const [content, setContent] = useState([])
+  const [pendingContent, setPendingContent] = useState([])
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       api.getProjects('?limit=100'),
-      api.getContent('?limit=50'),
+      api.getContent('?status=awaiting_client&limit=10'),
       api.getInvoices('?limit=50'),
     ]).then(([p, c, i]) => {
       setProjects(p.data || [])
-      setContent(c.data || [])
+      setPendingContent(c.data || [])
       setInvoices(i.data || [])
     }).catch(() => toast.error('Failed to load data'))
     .finally(() => setLoading(false))
@@ -34,7 +36,6 @@ export default function PortalOverview() {
   )
 
   const activeProjects = projects.filter(p => p.status === 'active')
-  const pendingApprovals = content.filter(c => c.status === 'awaiting_client')
   const unpaidInvoices = invoices.filter(i => ['sent', 'partial', 'overdue'].includes(i.status))
   const totalOutstanding = unpaidInvoices.reduce((s, i) => s + ((i.totalAmount || 0) - (i.paidAmount || 0)), 0)
 
@@ -50,7 +51,7 @@ export default function PortalOverview() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: 'Active Projects', value: activeProjects.length, icon: Briefcase, colour: 'var(--color-accent)' },
-          { label: 'Pending Approvals', value: pendingApprovals.length, icon: Clock, colour: 'var(--color-warning)' },
+          { label: 'Pending Approvals', value: pendingContent.length, icon: Clock, colour: 'var(--color-warning)' },
           { label: 'Unpaid Invoices', value: unpaidInvoices.length, icon: FileText, colour: 'var(--color-danger)' },
           { label: 'Outstanding', value: formatCurrency(totalOutstanding), icon: CheckCircle, colour: 'var(--color-success)' },
         ].map(card => (
@@ -67,48 +68,53 @@ export default function PortalOverview() {
       {/* Active Projects */}
       {activeProjects.length > 0 && (
         <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-[var(--color-border)]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
             <p className="font-semibold text-sm text-fg">Active Projects</p>
+            <button onClick={() => navigate('/portal/projects')} className="text-xs text-accent font-medium hover:underline flex items-center gap-1">
+              View all <ArrowRight size={11} />
+            </button>
           </div>
           <div className="divide-y divide-[var(--color-border)]">
             {activeProjects.slice(0, 5).map(p => (
-              <div key={p._id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-fg">{p.name}</p>
-                  <p className="text-xs text-fg-3 mt-0.5">{(p.type || []).join(', ').replace(/_/g, ' ') || '—'}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-xs text-fg-3">Progress</p>
-                    <p className="text-sm font-semibold text-fg">{p.overallProgress || 0}%</p>
+              <button key={p._id} onClick={() => navigate('/portal/projects')}
+                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-[var(--color-surface-2)] transition-colors">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-fg truncate">{p.name}</p>
+                  <p className="text-xs text-fg-3 mt-0.5">{(p.type || []).map(t => t.replace(/_/g, ' ')).join(', ') || '—'}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex-1 h-1 rounded-full bg-[var(--color-surface-3)] overflow-hidden" style={{ maxWidth: 120 }}>
+                      <div className="h-full rounded-full bg-accent" style={{ width: `${p.overallProgress || 0}%` }} />
+                    </div>
+                    <span className="text-[10px] text-fg-3">{p.overallProgress || 0}%</span>
                   </div>
-                  <StatusBadge status={p.status} />
                 </div>
-              </div>
+                <StatusBadge status={p.status} className="ml-3 flex-shrink-0" />
+              </button>
             ))}
           </div>
         </div>
       )}
 
       {/* Pending Approvals */}
-      {pendingApprovals.length > 0 && (
+      {pendingContent.length > 0 && (
         <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-[var(--color-border)]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
             <p className="font-semibold text-sm text-fg">Awaiting Your Approval</p>
+            <button onClick={() => navigate('/portal/content')} className="text-xs text-accent font-medium hover:underline flex items-center gap-1">
+              View all <ArrowRight size={11} />
+            </button>
           </div>
           <div className="divide-y divide-[var(--color-border)]">
-            {pendingApprovals.slice(0, 5).map(item => (
-              <div key={item._id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-fg">{item.title}</p>
+            {pendingContent.slice(0, 5).map(item => (
+              <button key={item._id} onClick={() => navigate('/portal/content')}
+                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-[var(--color-surface-2)] transition-colors">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-fg truncate">{item.title}</p>
                   <p className="text-xs text-fg-3 mt-0.5 capitalize">{(item.contentType || '').replace(/_/g, ' ')} · {(item.platform || []).join(', ')}</p>
                 </div>
-                <span className="badge badge-warning text-xs">Review</span>
-              </div>
+                <span className="badge badge-warning text-xs ml-3 flex-shrink-0">Review</span>
+              </button>
             ))}
-          </div>
-          <div className="px-4 py-2.5 border-t border-[var(--color-border)]">
-            <a href="/portal/content" className="text-xs text-accent font-medium hover:underline">View all content →</a>
           </div>
         </div>
       )}
@@ -116,8 +122,11 @@ export default function PortalOverview() {
       {/* Recent Invoices */}
       {unpaidInvoices.length > 0 && (
         <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-[var(--color-border)]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
             <p className="font-semibold text-sm text-fg">Outstanding Invoices</p>
+            <button onClick={() => navigate('/portal/invoices')} className="text-xs text-accent font-medium hover:underline flex items-center gap-1">
+              View all <ArrowRight size={11} />
+            </button>
           </div>
           <div className="divide-y divide-[var(--color-border)]">
             {unpaidInvoices.slice(0, 5).map(inv => (
@@ -136,7 +145,7 @@ export default function PortalOverview() {
         </div>
       )}
 
-      {activeProjects.length === 0 && pendingApprovals.length === 0 && unpaidInvoices.length === 0 && (
+      {activeProjects.length === 0 && pendingContent.length === 0 && unpaidInvoices.length === 0 && (
         <div className="card p-12 text-center">
           <p className="text-fg-3 text-sm">Everything is up to date. No pending actions.</p>
         </div>

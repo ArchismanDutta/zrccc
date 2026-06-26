@@ -40,6 +40,8 @@ export default function DashboardPage() {
   const [content, setContent] = useState([])
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
+  const [todayTasks, setTodayTasks] = useState([])
+  const [reviewContent, setReviewContent] = useState([])
 
   const isSuperAdmin = user?.role === 'super_admin'
 
@@ -55,7 +57,11 @@ export default function DashboardPage() {
         const financePromises = isSuperAdmin
           ? [api.getRevenueChart(6), api.getInvoices('?status=overdue,partial,sent&limit=4')]
           : [Promise.resolve(null), Promise.resolve(null)]
-        const [dash, proj, task, cont, rev, inv] = await Promise.all([...base, ...financePromises])
+        const [dash, proj, task, cont, rev, inv, todayT, reviewC] = await Promise.all([
+          ...base, ...financePromises,
+          api.getTasks('?sort=dueDate&limit=30'),
+          api.getContent('?limit=20'),
+        ])
         setKpis(dash.data?.kpis || {})
         setProjects(proj.data || [])
         setTasks(task.data || [])
@@ -65,6 +71,15 @@ export default function DashboardPage() {
           collected: d.collected || 0, expected: d.expected || 0,
         })))
         if (inv) setInvoices(inv.data || [])
+        const todayStr = new Date().toISOString().slice(0, 10)
+        setTodayTasks((todayT.data || []).filter(t => {
+          if (!t.dueDate) return false
+          if (['done', 'cancelled'].includes(t.status)) return false
+          return t.dueDate.slice(0, 10) <= todayStr
+        }))
+        setReviewContent((reviewC.data || []).filter(c =>
+          ['in_review', 'revision_needed'].includes(c.status)
+        ).slice(0, 6))
       } catch (err) {
         console.error('Dashboard fetch failed:', err)
         toast.error('Failed to load dashboard data')
@@ -94,6 +109,67 @@ export default function DashboardPage() {
         {isSuperAdmin && <StatCard label="Revenue" value={formatCurrency(kpis.collectedThisMonth || 0)} sub={`Expected ${formatCurrency(kpis.expectedMRR || 0)}`} icon={DollarSign} variant="warning" />}
         <StatCard label="Open Tasks" value={kpis.openTasks ?? 0} sub={`${kpis.dueTodayTasks ?? 0} due today`} icon={CheckSquare} variant="danger" />
       </div>
+
+      {/* Today panel — only renders when there's something to show */}
+      {(todayTasks.length > 0 || reviewContent.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+          <SectionCard
+            title="Due Today / Overdue"
+            subtitle="Tasks needing attention now"
+            actions={<a href="/tasks" className="btn btn-ghost btn-sm text-xs gap-1">All tasks <ArrowRight size={12} /></a>}
+          >
+            <div className="space-y-1">
+              {todayTasks.length === 0
+                ? <p className="text-xs text-fg-3 text-center py-3">All clear!</p>
+                : todayTasks.slice(0, 6).map(t => {
+                  const tDate = t.dueDate ? t.dueDate.slice(0, 10) : null
+                  const today = new Date().toISOString().slice(0, 10)
+                  const isOverdue = tDate && tDate < today
+                  return (
+                    <div key={t._id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-[var(--color-surface-2)] transition-colors cursor-pointer">
+                      <span className="text-sm flex-shrink-0">{isOverdue ? '🔴' : '🟡'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-fg truncate">{t.title}</p>
+                        <p className={cn('text-[10px] mt-0.5', isOverdue ? 'text-[var(--color-danger)]' : 'text-[var(--color-warning)]')}>
+                          {isOverdue ? 'Overdue' : 'Due today'}{t.assignedTo?.[0]?.name ? ` • ${t.assignedTo[0].name}` : ''}
+                        </p>
+                      </div>
+                      <PriorityBadge priority={t.priority} />
+                    </div>
+                  )
+                })
+              }
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Pending Review"
+            subtitle="Content awaiting your action"
+            actions={<a href="/content" className="btn btn-ghost btn-sm text-xs gap-1">Calendar <ArrowRight size={12} /></a>}
+          >
+            <div className="space-y-1">
+              {reviewContent.length === 0
+                ? <p className="text-xs text-fg-3 text-center py-3">Nothing to review!</p>
+                : reviewContent.map(c => {
+                  const Icon = CONTENT_TYPE_ICON[c.contentType] ?? CONTENT_TYPE_ICON.default
+                  return (
+                    <div key={c._id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-[var(--color-surface-2)] transition-colors cursor-pointer">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-accent-ghost">
+                        <Icon size={13} className="text-accent" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-fg truncate">{c.title}</p>
+                        <p className="text-[10px] text-fg-3 mt-0.5">{c.clientId?.displayName || c.clientId?.companyName || '—'}</p>
+                      </div>
+                      <StatusBadge status={c.status} />
+                    </div>
+                  )
+                })
+              }
+            </div>
+          </SectionCard>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         {isSuperAdmin && (
