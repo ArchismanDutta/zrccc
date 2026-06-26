@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+client/dist/
+
+# Environment files — NEVER commit real secrets
+server/.env
+# .env.production is safe to commit (it only has VITE_API_URL=/api, no secrets)
+# server/.env.production.example is a template — safe to commit
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Uploads (user-uploaded files, not code)
+server/uploads/

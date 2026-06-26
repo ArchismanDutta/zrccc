@@ -1,0 +1,61 @@
+name: Deploy to AWS EC2
+
+# Trigger: any push to the main branch
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Confirm the push ──────────────────────────────────────────────
+      - name: Show commit info
+        run: echo "Deploying commit ${{ github.sha }} by ${{ github.actor }}"
+
+      # ── 2. SSH into EC2 and run the deploy script ────────────────────────
+      #
+      #  appleboy/ssh-action connects to your EC2, runs every line in `script`
+      #  exactly as if you typed it in the terminal.
+      #  `set -e` means the whole script stops on the first error, so a failed
+      #  build will NOT restart PM2 — your live server keeps the old version.
+      #
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            echo "──────────────────────────────────────"
+            echo " ZRC CRM Deploy — $(date)"
+            echo "──────────────────────────────────────"
+
+            cd /home/ubuntu/zrccrm
+
+            # Pull latest code from GitHub
+            echo "[1/4] Pulling latest code..."
+            git pull origin main
+
+            # Install / update server (Node.js) dependencies
+            echo "[2/4] Installing server dependencies..."
+            cd server
+            npm install --omit=dev
+            cd ..
+
+            # Build the React frontend
+            echo "[3/4] Building React client..."
+            cd client
+            npm install
+            npm run build
+            cd ..
+
+            # Restart the Node.js process via PM2
+            echo "[4/4] Restarting application..."
+            pm2 restart ecosystem.config.js --env production --update-env
+
+            echo "✅ Deploy complete!"

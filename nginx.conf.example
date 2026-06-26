@@ -1,0 +1,76 @@
+# ─────────────────────────────────────────────────────────────
+#  Nginx config for ZRC CRM
+#
+#  On EC2, save this file as:
+#    /etc/nginx/sites-available/zrccrm
+#
+#  Then enable it:
+#    sudo ln -s /etc/nginx/sites-available/zrccrm /etc/nginx/sites-enabled/
+#    sudo nginx -t
+#    sudo systemctl reload nginx
+#
+#  After that, run Certbot to add HTTPS automatically:
+#    sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+# ─────────────────────────────────────────────────────────────
+
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+
+    # ── Gzip compression ──────────────────────────────────────
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types
+        text/plain text/css text/xml
+        application/json application/javascript application/xml+rss
+        image/svg+xml;
+
+    # ── React SPA (built files) ───────────────────────────────
+    location / {
+        root /home/ubuntu/zrccrm/client/dist;
+        index index.html;
+        # For React Router: always fall back to index.html
+        try_files $uri $uri/ /index.html;
+
+        # Cache static assets aggressively (Vite adds hashes to filenames)
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2|woff|ttf)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+
+    # ── Node.js API proxy ─────────────────────────────────────
+    location /api/ {
+        proxy_pass         http://localhost:5001;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # Increase timeouts for file uploads / long requests
+        proxy_connect_timeout 60s;
+        proxy_send_timeout    60s;
+        proxy_read_timeout    60s;
+    }
+
+    # ── Socket.io (WebSocket upgrade) ─────────────────────────
+    location /socket.io/ {
+        proxy_pass         http://localhost:5001;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host       $host;
+        proxy_set_header   X-Real-IP  $remote_addr;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# ─────────────────────────────────────────────────────────────
+#  NOTE: Certbot will automatically add an HTTPS server block
+#  below this one when you run:
+#    sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+#  You do NOT need to write the HTTPS block yourself.
+# ─────────────────────────────────────────────────────────────
