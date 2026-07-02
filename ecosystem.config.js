@@ -11,11 +11,12 @@ module.exports = {
     {
       name: 'zrccrm',
 
-      // Entry point — relative to where you run pm2 from (/home/ubuntu/zrccrm)
+      // Entry point — relative to the project root
       script: 'server/server.js',
 
-      // Working directory — must be the project root
-      cwd: '/home/ubuntu/zrccrm',
+      // Working directory — resolves to wherever this file lives (project root),
+      // so it works regardless of what folder name you cloned into.
+      cwd: __dirname,
 
       // Only 1 instance (not cluster mode) for a t3.small
       instances: 1,
@@ -35,7 +36,7 @@ module.exports = {
 
       // Production environment variables
       // These are OVERRIDES on top of whatever is in server/.env
-      // The real secrets live in /home/ubuntu/zrccrm/server/.env on the EC2
+      // The real secrets live in server/.env on the EC2
       env_production: {
         NODE_ENV: 'production',
         PORT: 5001,

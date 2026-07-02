@@ -1,6 +1,9 @@
 // config/env.js
 // Validates and exports all environment variables.
-require("dotenv").config();
+const path = require("path");
+// Resolve .env relative to this file so it works regardless of where
+// the process is started from (project root via PM2, or server/ in dev).
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -66,4 +69,9 @@ module.exports = {
 
   COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || "localhost",
   IS_PRODUCTION: isProduction,
+  // Set COOKIE_SECURE=false in .env to allow cookies over plain HTTP (e.g. when testing
+  // on an EC2 IP before you have a domain + HTTPS). Defaults to true in production.
+  COOKIE_SECURE: process.env.COOKIE_SECURE !== undefined
+    ? process.env.COOKIE_SECURE === "true"
+    : isProduction,
 };

@@ -31,31 +31,34 @@ jobs:
           script: |
             set -e
 
+            # Load nvm so npm/node are available in this non-interactive SSH session
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
             echo "──────────────────────────────────────"
             echo " ZRC CRM Deploy — $(date)"
             echo "──────────────────────────────────────"
 
-            cd /home/ubuntu/zrccrm
+            cd /home/ubuntu/zrccc
 
             # Pull latest code from GitHub
-            echo "[1/4] Pulling latest code..."
+            echo "[1/5] Pulling latest code..."
             git pull origin main
 
-            # Install / update server (Node.js) dependencies
-            echo "[2/4] Installing server dependencies..."
-            cd server
-            npm install --omit=dev
-            cd ..
+            # Install / update server dependencies
+            echo "[2/5] Installing server dependencies..."
+            cd server && npm install --omit=dev && cd ..
 
             # Build the React frontend
-            echo "[3/4] Building React client..."
-            cd client
-            npm install
-            npm run build
-            cd ..
+            echo "[3/5] Building React client..."
+            cd client && npm install && npm run build && cd ..
 
             # Restart the Node.js process via PM2
-            echo "[4/4] Restarting application..."
+            echo "[4/5] Restarting application..."
             pm2 restart ecosystem.config.js --env production --update-env
+
+            # Reload Nginx to serve new static files
+            echo "[5/5] Reloading Nginx..."
+            sudo systemctl reload nginx
 
             echo "✅ Deploy complete!"

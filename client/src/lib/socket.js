@@ -3,7 +3,11 @@
 // Messages.jsx joins/leaves channel rooms on top of the same connection.
 import { io } from 'socket.io-client'
 
-const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'
+// If VITE_API_URL is a relative path (e.g. '/api'), pass undefined so socket.io
+// connects to the current page origin (correct in production behind Nginx).
+// If it's an absolute URL (e.g. 'http://localhost:5001'), strip '/api' to get the base.
+const _base = (import.meta.env.VITE_API_URL || '').replace('/api', '')
+const SOCKET_URL = _base.startsWith('http') ? _base : undefined
 
 let _socket = null
 

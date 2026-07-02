@@ -1,21 +1,32 @@
 # ─────────────────────────────────────────────────────────────
 #  Nginx config for ZRC CRM
 #
-#  On EC2, save this file as:
-#    /etc/nginx/sites-available/zrccrm
+#  PHASE 1 — No domain yet (HTTP on EC2 IP)
+#  ─────────────────────────────────────────
+#  Use `server_name _;` (the catch-all below). Access the app at:
+#    http://<EC2_PUBLIC_IP>
 #
-#  Then enable it:
+#  PHASE 2 — Once you have a domain
+#  ──────────────────────────────────
+#  1. Replace `server_name _;` with `server_name yourdomain.com www.yourdomain.com;`
+#  2. Run Certbot: sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+#  3. Update server/.env: FRONTEND_ORIGINS, COOKIE_DOMAIN, COOKIE_SECURE=true
+#  4. Restart: pm2 restart zrccrm
+#
+#  Setup commands (run once):
+#    sudo cp /home/ubuntu/zrccrm/nginx.conf.example /etc/nginx/sites-available/zrccrm
 #    sudo ln -s /etc/nginx/sites-available/zrccrm /etc/nginx/sites-enabled/
+#    sudo rm -f /etc/nginx/sites-enabled/default
 #    sudo nginx -t
 #    sudo systemctl reload nginx
-#
-#  After that, run Certbot to add HTTPS automatically:
-#    sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
 # ─────────────────────────────────────────────────────────────
 
 server {
     listen 80;
-    server_name yourdomain.com www.yourdomain.com;
+    # PHASE 1: catch-all (works with bare IP, no domain needed)
+    server_name _;
+    # PHASE 2: replace the line above with your domain:
+    # server_name yourdomain.com www.yourdomain.com;
 
     # ── Gzip compression ──────────────────────────────────────
     gzip on;
@@ -69,8 +80,10 @@ server {
 }
 
 # ─────────────────────────────────────────────────────────────
-#  NOTE: Certbot will automatically add an HTTPS server block
-#  below this one when you run:
+#  NOTE (Phase 2 only):
+#  Certbot will automatically add an HTTPS server block when you run:
 #    sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
 #  You do NOT need to write the HTTPS block yourself.
+#  After Certbot runs, it also updates the server_name line — make sure
+#  you've already changed it from `_` to your actual domain first.
 # ─────────────────────────────────────────────────────────────

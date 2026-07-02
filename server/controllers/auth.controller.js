@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const jwt  = require("jsonwebtoken");
 const User = require("../models/User");
 const { nextSequence } = require("../models/Counter");
-const { JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, JWT_ACCESS_EXPIRES, JWT_REFRESH_EXPIRES, IS_PRODUCTION, FRONTEND_ORIGINS } = require("../config/env");
+const { JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, JWT_ACCESS_EXPIRES, JWT_REFRESH_EXPIRES, IS_PRODUCTION, COOKIE_SECURE, FRONTEND_ORIGINS } = require("../config/env");
 const { ROLE_LEVELS } = require("../config/roles");
 const { success, error: sendError } = require("../utils/response");
 const { ValidationError, AuthenticationError, NotFoundError } = require("../utils/errors");
@@ -18,15 +18,15 @@ const REFRESH_MAX_AGE = parseExpiry(JWT_REFRESH_EXPIRES || "7d");
 function cookieOpts(maxAge) {
   return {
     httpOnly:  true,
-    secure:    IS_PRODUCTION,
+    secure:    COOKIE_SECURE,
     sameSite:  "strict",
     maxAge,
   };
 }
 
 function clearAuthCookies(res) {
-  res.clearCookie("accessToken",  { httpOnly: true, secure: IS_PRODUCTION, sameSite: "strict" });
-  res.clearCookie("refreshToken", { httpOnly: true, secure: IS_PRODUCTION, sameSite: "strict" });
+  res.clearCookie("accessToken",  { httpOnly: true, secure: COOKIE_SECURE, sameSite: "strict" });
+  res.clearCookie("refreshToken", { httpOnly: true, secure: COOKIE_SECURE, sameSite: "strict" });
 }
 
 // Creates a new session entry and sets auth cookies. Used at login and after password change.
