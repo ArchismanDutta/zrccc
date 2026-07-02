@@ -41,9 +41,10 @@ jobs:
 
             cd /home/ubuntu/zrccc
 
-            # Pull latest code from GitHub
+            # Pull latest code from GitHub (force-sync to avoid local edit conflicts)
             echo "[1/5] Pulling latest code..."
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
 
             # Install / update server dependencies
             echo "[2/5] Installing server dependencies..."
